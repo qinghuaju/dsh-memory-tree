@@ -5,6 +5,7 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A522.5-brightgreen.svg)](https://nodejs.org)
 [![tests](https://img.shields.io/badge/tests-40%20offline%20checks-success.svg)](scripts/selftest.mjs)
+[![ci](https://github.com/qinghuaju/dsh-memory-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/qinghuaju/dsh-memory-tree/actions/workflows/ci.yml)
 [![dsh](https://img.shields.io/badge/DSH-plugin-6f42c1.svg)](https://github.com/deepseek-ai/deepseek-harness)
 [![PRs](https://img.shields.io/badge/PRs-welcome-ff69b4.svg)](CONTRIBUTING.md)
 
