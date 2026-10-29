@@ -93,7 +93,13 @@ if (!existsSync(file)) {
         }
         if (plugin.icon !== undefined) {
           if (typeof plugin.icon !== 'string') fail(`${at}.icon`, 'must be a string');
-          else if (!/^data:image\/(?:svg\+xml|png|jpeg|webp);base64,/i.test(plugin.icon)) isHttpUrl(plugin.icon, `${at}.icon`);
+          else if (/^data:image\/(?:svg\+xml|png|jpeg|webp);base64,/i.test(plugin.icon)) {
+            // inline icon: size is enforced by DSH; nothing else to check here
+          } else if (/^[a-z]+:/i.test(plugin.icon)) {
+            isHttpUrl(plugin.icon, `${at}.icon`);
+          } else if (plugin.icon.split('/').some((segment) => segment === '.' || segment === '..')) {
+            fail(`${at}.icon`, 'relative icon must not contain . or .. segments');
+          }
         }
         if (plugin.metadata !== undefined && !isObject(plugin.metadata)) fail(`${at}.metadata`, 'must be an object');
 

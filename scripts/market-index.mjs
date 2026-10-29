@@ -44,7 +44,7 @@ const publishTimestamp = Math.floor(Date.now() / 1000);
 
 const source = useNpm
   ? { type: 'npm', ...(registry ? { registry: String(registry) } : {}) }
-  : { type: 'git', url: repoUrl, commit, path: '.' };
+  : { type: 'git', url: repoUrl, commit };
 
 const index = {
   format: 1,
@@ -69,7 +69,7 @@ const index = {
       icon: 'icon.svg',
       author: 'dsh-memory-tree contributors',
       homepage: repoUrl,
-      repository: { url: repoUrl, directory: '.' },
+      repository: { url: repoUrl },
       metadata: {
         category: 'memory',
         keywords: pkg.keywords ?? ['dsh', 'memory', 'sqlite', 'embedding'],
