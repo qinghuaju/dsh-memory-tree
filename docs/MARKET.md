@@ -27,8 +27,8 @@ A market index is one JSON document, validated by `@deepseek-ai/dsh-plugin-marke
       "title": { "en": "Memory Tree", "zh": "记忆树" },
       "description": { "en": "...", "zh": "..." },
       "icon": "icon.svg",                 // relative to the index URL, or a data: URL ≤ 32 KiB
-      "homepage": "https://github.com/<owner>/dsh-memory-tree",
-      "repository": { "url": "https://github.com/<owner>/dsh-memory-tree", "directory": "." },
+      "homepage": "https://github.com/qinghuaju/dsh-memory-tree",
+      "repository": { "url": "https://github.com/qinghuaju/dsh-memory-tree", "directory": "." },
       "metadata": { "category": "memory", "keywords": ["memory", "sqlite", "embedding"] },
       "versions": [
         {
@@ -36,7 +36,7 @@ A market index is one JSON document, validated by `@deepseek-ai/dsh-plugin-marke
           "publishTimestamp": 1793000000, // Unix seconds
           "source": {
             "type": "git",                // or "npm"
-            "url": "https://github.com/<owner>/dsh-memory-tree",
+            "url": "https://github.com/qinghuaju/dsh-memory-tree",
             "commit": "<lowercase 40-hex commit>",
             "path": "."                   // optional package directory
           },
@@ -68,14 +68,14 @@ document from `package.json` + a commit SHA.
 
 ```bash
 # after the release commit exists:
-node scripts/market-index.mjs --owner <github-user> --repo dsh-memory-tree --commit <sha> --npm
+node scripts/market-index.mjs --owner qinghuaju --repo dsh-memory-tree --commit <sha> --npm
 node scripts/check-market.mjs
 ```
 
 Host `market/index.json` at a stable https URL, e.g. GitHub Pages:
 
 ```
-https://<owner>.github.io/dsh-memory-tree/market/index.json
+https://qinghuaju.github.io/dsh-memory-tree/market/index.json
 ```
 
 or the raw file:
@@ -105,12 +105,12 @@ Keep the `icon` next to it (`market/icon.svg`) so it resolves relatively.
 2. Restart DSH → **Settings → Plugins → Discover**, or call the host API:
 
    ```
-   pluginMarket.setIndexes(["https://<owner>.github.io/dsh-memory-tree/market/index.json"])
+   pluginMarket.setIndexes(["https://qinghuaju.github.io/dsh-memory-tree/market/index.json"])
    pluginMarket.listIndexes()
    ```
 
 3. The listing shows the plugin with its versions; **Install** resolves to
-   `git+https://github.com/<owner>/dsh-memory-tree.git#<commit>&path:/.` and goes through
+   `git+https://github.com/qinghuaju/dsh-memory-tree.git#<commit>&path:/.` and goes through
    `pluginManager.installBundle`.
 
 If your DSH build does not ship the market bundle, the same JSON is still useful: agents can read

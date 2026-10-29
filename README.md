@@ -47,7 +47,7 @@ Other machines, npm/tarball, offline mode: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 ## Install from Git
 
 ```bash
-git clone https://github.com/<owner>/dsh-memory-tree.git
+git clone https://github.com/qinghuaju/dsh-memory-tree.git
 cd dsh-memory-tree
 
 # pick the profile your DSH loads (desktop app vs `dsh web`)
@@ -65,7 +65,7 @@ DSH 0.2.1-rc.3 ships the market **off by default and with no index URL**. To pub
 listing, generate `market/index.json` and add its URL in **Settings → Plugins → Discover**:
 
 ```bash
-node scripts/market-index.mjs --owner <github-user> --commit <40-hex-sha> --npm
+node scripts/market-index.mjs --owner qinghuaju --commit <40-hex-sha> --npm
 node scripts/check-market.mjs
 ```
 

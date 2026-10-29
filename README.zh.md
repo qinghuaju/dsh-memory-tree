@@ -45,7 +45,7 @@ node scripts/install.mjs --profile "$DSH_HOME/profiles/desktop" --copy-to
 ## 用 Git 安装
 
 ```bash
-git clone https://github.com/<owner>/dsh-memory-tree.git
+git clone https://github.com/qinghuaju/dsh-memory-tree.git
 cd dsh-memory-tree
 
 # 选应用实际加载的 profile（桌面版 / dsh web 不同）
@@ -62,7 +62,7 @@ DSH 0.2.1-rc.3 的市场**默认关闭、且没有预置索引**。要发布或�
 再到 **设置 → 插件 → Discover** 添加索引 URL：
 
 ```bash
-node scripts/market-index.mjs --owner <github-用户名> --commit <40位sha> --npm
+node scripts/market-index.mjs --owner qinghuaju --commit <40位sha> --npm
 node scripts/check-market.mjs
 ```
 

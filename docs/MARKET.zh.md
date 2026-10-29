@@ -26,8 +26,8 @@
       "title": { "en": "Memory Tree", "zh": "记忆树" },
       "description": { "en": "...", "zh": "..." },
       "icon": "icon.svg",
-      "homepage": "https://github.com/<owner>/dsh-memory-tree",
-      "repository": { "url": "https://github.com/<owner>/dsh-memory-tree", "directory": "." },
+      "homepage": "https://github.com/qinghuaju/dsh-memory-tree",
+      "repository": { "url": "https://github.com/qinghuaju/dsh-memory-tree", "directory": "." },
       "metadata": { "category": "memory", "keywords": ["memory", "sqlite", "embedding"] },
       "versions": [
         {
@@ -35,7 +35,7 @@
           "publishTimestamp": 1793000000,
           "source": {
             "type": "git",
-            "url": "https://github.com/<owner>/dsh-memory-tree",
+            "url": "https://github.com/qinghuaju/dsh-memory-tree",
             "commit": "<40 位小写 commit>",
             "path": "."
           },
@@ -65,14 +65,14 @@
 
 ```bash
 # 发布提交完成之后：
-node scripts/market-index.mjs --owner <github-用户名> --repo dsh-memory-tree --commit <sha> --npm
+node scripts/market-index.mjs --owner qinghuaju --repo dsh-memory-tree --commit <sha> --npm
 node scripts/check-market.mjs
 ```
 
 托管到稳定 https 地址，例如 GitHub Pages：
 
 ```
-https://<owner>.github.io/dsh-memory-tree/market/index.json
+https://qinghuaju.github.io/dsh-memory-tree/market/index.json
 ```
 
 或 raw：
@@ -101,12 +101,12 @@ https://raw.githubusercontent.com/<owner>/dsh-memory-tree/main/market/index.json
 2. 重启 DSH → **设置 → 插件 → Discover**，或调用宿主接口：
 
    ```
-   pluginMarket.setIndexes(["https://<owner>.github.io/dsh-memory-tree/market/index.json"])
+   pluginMarket.setIndexes(["https://qinghuaju.github.io/dsh-memory-tree/market/index.json"])
    pluginMarket.listIndexes()
    ```
 
 3. 列表中会出现插件与版本；**安装**会解析为
-   `git+https://github.com/<owner>/dsh-memory-tree.git#<commit>&path:/.`，走 `pluginManager.installBundle`。
+   `git+https://github.com/qinghuaju/dsh-memory-tree.git#<commit>&path:/.`，走 `pluginManager.installBundle`。
 
 若你的 DSH 构建没有市场 bundle，这份 JSON 仍可用于 CI 校验与代理读取，等市场可用再接。
 
