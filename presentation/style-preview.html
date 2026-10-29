@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>dsh-memory-tree · 风格样张</title>
+<style>
+  /* ── 三套主题令牌 ─────────────────────────────────────────────────────── */
+  :root{
+    --dur-in: 520ms;
+    --dur-out: 280ms;
+    --step: 70ms;
+    --ease: cubic-bezier(.2,.7,.2,1);
+  }
+  body[data-theme="graphite"]{
+    --bg:#0B0E12; --bg-2:#0F141B; --surface:#121821; --surface-2:#1A2230;
+    --ink:#E7EDF5; --ink-2:#9FB0C4; --ink-3:#6B7A8D;
+    --accent:#4FE3B0; --accent-2:#7AA2FF; --warn:#FFB86B;
+    --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.05);
+    --grid:rgba(255,255,255,.045);
+    --font-head:"Noto Sans SC","Source Han Sans SC","Microsoft YaHei UI","PingFang SC",system-ui,sans-serif;
+    --font-body:"Noto Sans SC","Source Han Sans SC","Microsoft YaHei UI","PingFang SC",system-ui,sans-serif;
+    --font-mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+    --radius:14px; --glow:0 0 0 rgba(0,0,0,0);
+    --kicker-letter:.18em;
+  }
+  body[data-theme="paper"]{
+    --bg:#F6F1E7; --bg-2:#F1EADC; --surface:#FFFDF8; --surface-2:#FBF5E9;
+    --ink:#17140F; --ink-2:#5D5548; --ink-3:#8A8071;
+    --accent:#D6452F; --accent-2:#2F6B5A; --warn:#C98A2E;
+    --line:rgba(23,20,15,.16); --line-2:rgba(23,20,15,.08);
+    --grid:rgba(23,20,15,.05);
+    --font-head:"Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+    --font-body:"Noto Sans SC","Source Han Sans SC","Microsoft YaHei UI",system-ui,sans-serif;
+    --font-mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+    --radius:6px; --glow:0 0 0 rgba(0,0,0,0);
+    --kicker-letter:.22em;
+  }
+  body[data-theme="synapse"]{
+    --bg:#080D1A; --bg-2:#101A33; --surface:rgba(20,32,58,.62); --surface-2:rgba(30,46,82,.55);
+    --ink:#EAF2FF; --ink-2:#A8BAD8; --ink-3:#7183A6;
+    --accent:#55D6FF; --accent-2:#A78BFA; --warn:#FFC46B;
+    --line:rgba(150,180,255,.18); --line-2:rgba(150,180,255,.09);
+    --grid:rgba(140,170,255,.06);
+    --font-head:"Noto Sans SC","Source Han Sans SC","Microsoft YaHei UI",system-ui,sans-serif;
+    --font-body:"Noto Sans SC","Source Han Sans SC","Microsoft YaHei UI",system-ui,sans-serif;
+    --font-mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+    --radius:18px; --glow:0 24px 80px rgba(85,214,255,.16);
+    --kicker-letter:.2em;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font-body); overflow:hidden;
+    transition:background .35s ease,color .35s ease;
+  }
+  body[data-theme="paper"]{ background:var(--bg) radial-gradient(1200px 700px at 78% -10%, rgba(214,69,47,.05), transparent 60%); }
+
+  /* ── 舞台 ─────────────────────────────────────────────────────────────── */
+  .viewport{
+    position:fixed; inset:0; display:grid; place-items:center;
+    padding:48px 40px 104px;
+  }
+  .stage{
+    position:relative; width:min(100%, 1640px); aspect-ratio:16/9;
+    container-type:inline-size;
+    border-radius:18px; overflow:hidden;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100% 6.4cqw,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 6.4cqw 100%,
+      radial-gradient(120% 90% at 85% -20%, var(--surface-2), transparent 60%),
+      linear-gradient(180deg, var(--bg-2), var(--bg));
+    box-shadow:0 40px 120px rgba(0,0,0,.35), inset 0 0 0 1px var(--line);
+    transition:background .35s ease, box-shadow .35s ease;
+  }
+  .stage::after{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(60% 50% at 50% 110%, rgba(0,0,0,.18), transparent 70%);
+  }
+  body[data-theme="synapse"] .stage{
+    background:
+      radial-gradient(60% 45% at 20% 10%, rgba(85,214,255,.12), transparent 70%),
+      radial-gradient(50% 40% at 82% 18%, rgba(167,139,250,.14), transparent 70%),
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100% 6.4cqw,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 6.4cqw 100%,
+      linear-gradient(160deg, #0C1428, #070B16 70%);
+  }
+
+  .slide{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    padding:5.2cqw 6cqw 4.2cqw;
+  }
+
+  /* ── 页头 ─────────────────────────────────────────────────────────────── */
+  .kicker{
+    display:flex; align-items:center; gap:.9cqw;
+    font-family:var(--font-mono); font-size:1.05cqw; letter-spacing:var(--kicker-letter);
+    color:var(--accent); text-transform:uppercase;
+  }
+  .kicker::before{
+    content:""; width:2.4cqw; height:1px; background:currentColor; opacity:.7;
+  }
+  .kicker .idx{ color:var(--ink-3); letter-spacing:.1em; }
+
+  h1{
+    margin:2.2cqw 0 0; font-family:var(--font-head); font-weight:700;
+    font-size:4.55cqw; line-height:1.18; letter-spacing:-.012em;
+    max-width:72cqw;
+  }
+  h1 em{
+    font-style:normal; color:var(--accent);
+    background:linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .lead{
+    margin:1.35cqw 0 0; font-size:1.55cqw; line-height:1.75;
+    color:var(--ink-2); max-width:64cqw;
+  }
+  .lead b{ color:var(--ink); font-weight:600; }
+
+  /* ── 结构图 ───────────────────────────────────────────────────────────── */
+  .diagram{
+    margin-top:2.4cqw; flex:1 1 auto; min-height:0; display:flex; align-items:center;
+  }
+  .diagram svg{ width:100%; height:100%; display:block; overflow:visible; }
+
+  .node-box{
+    fill:var(--surface); stroke:var(--line); stroke-width:1.2;
+    transition:fill .35s ease, stroke .35s ease;
+  }
+  .node-head{ fill:var(--ink); font:600 15px/1 var(--font-head); }
+  .node-sub{ fill:var(--ink-3); font:11.5px/1 var(--font-mono); letter-spacing:.04em; }
+  .node-tag{ fill:var(--accent); font:600 11px/1 var(--font-mono); letter-spacing:.14em; }
+  .wire{ stroke:var(--line); stroke-width:1.2; fill:none; }
+  .wire-hot{ stroke:var(--accent); stroke-width:1.6; fill:none; stroke-dasharray:6 8; opacity:.85; }
+  .dot{ fill:var(--accent); }
+
+  /* ── 指标行 ───────────────────────────────────────────────────────────── */
+  .metrics{
+    display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:2.4cqw;
+    padding-top:2.2cqw; border-top:1px solid var(--line-2);
+  }
+  .metric .k{
+    font-family:var(--font-mono); font-size:.95cqw; letter-spacing:.12em;
+    color:var(--ink-3); text-transform:uppercase;
+  }
+  .metric .v{
+    margin-top:.55cqw; font-family:var(--font-mono); font-weight:600;
+    font-size:3.15cqw; line-height:1.05; color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  .metric .v small{ font-size:1.25cqw; color:var(--ink-2); margin-left:.4cqw; font-weight:400; }
+  .metric .n{ margin-top:.5cqw; font-size:1.02cqw; color:var(--ink-3); }
+
+  /* ── 页脚 ─────────────────────────────────────────────────────────────── */
+  .foot{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:2.1cqw; font-family:var(--font-mono); font-size:.95cqw;
+    color:var(--ink-3); letter-spacing:.06em;
+  }
+  .foot .tag{ color:var(--warn); }
+
+  /* ── 控制条 ───────────────────────────────────────────────────────────── */
+  .bar{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;
+    padding:10px 14px; border-radius:999px;
+    background:color-mix(in srgb, var(--surface) 78%, transparent);
+    border:1px solid var(--line); backdrop-filter:blur(10px);
+    box-shadow:0 18px 50px rgba(0,0,0,.25);
+    font-family:var(--font-mono); font-size:12px; z-index:10;
+  }
+  .bar .sep{ width:1px; height:18px; background:var(--line); margin:0 2px; }
+  .bar button{
+    all:unset; cursor:pointer; padding:7px 12px; border-radius:999px;
+    color:var(--ink-2); border:1px solid transparent; transition:.2s ease;
+    letter-spacing:.02em;
+  }
+  .bar button:hover{ color:var(--ink); border-color:var(--line); }
+  .bar button[aria-pressed="true"]{
+    color:var(--bg); background:var(--accent); border-color:var(--accent); font-weight:600;
+  }
+  .bar .hint{ color:var(--ink-3); padding-left:2px; }
+  .bar kbd{
+    font-family:var(--font-mono); font-size:11px; padding:1px 5px; border-radius:4px;
+    border:1px solid var(--line); color:var(--ink-2);
+  }
+
+  /* ── 动效 ─────────────────────────────────────────────────────────────── */
+  .anim{ opacity:0; will-change:transform,opacity; }
+  .stage[data-state="in"] .anim{
+    animation:rise var(--dur-in) var(--ease) both;
+    animation-delay:var(--d,0ms);
+  }
+  .stage[data-state="out"] .anim{
+    animation:sink var(--dur-out) cubic-bezier(.4,0,1,1) both;
+    animation-delay:var(--do,0ms);
+  }
+  @keyframes rise{
+    from{ opacity:0; transform:translateY(16px); filter:blur(2px); }
+    to{ opacity:1; transform:translateY(0); filter:blur(0); }
+  }
+  @keyframes sink{
+    from{ opacity:1; transform:translateY(0); filter:blur(0); }
+    to{ opacity:0; transform:translateY(-12px); filter:blur(2px); }
+  }
+
+  /* SVG 节点与连线 */
+  .stage[data-state="in"] .node{ animation:pop 520ms var(--ease) both; animation-delay:var(--d,0ms); }
+  @keyframes pop{
+    from{ opacity:0; transform:translateY(10px) scale(.985); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  .stage[data-state="in"] .draw{ stroke-dasharray:220; animation:draw 900ms var(--ease) both; animation-delay:var(--d,0ms); }
+  @keyframes draw{
+    from{ stroke-dashoffset:220; }
+    to{ stroke-dashoffset:0; }
+  }
+  .stage[data-state="in"] .fade-dot{ animation:blink 2.4s ease-in-out infinite; animation-delay:var(--d,0ms); }
+  @keyframes blink{ 0%,100%{ opacity:.35 } 50%{ opacity:1 } }
+
+  body[data-theme="synapse"] .node-box{ fill:rgba(18,28,52,.55); stroke:rgba(120,160,255,.22); }
+  body[data-theme="synapse"] .diagram svg{ filter:drop-shadow(0 12px 40px rgba(85,214,255,.12)); }
+  body[data-theme="paper"] .node-box{ fill:#FFFDF8; stroke:rgba(23,20,15,.22); stroke-width:1.4; }
+  body[data-theme="paper"] .wire{ stroke:rgba(23,20,15,.22); }
+  body[data-theme="paper"] h1 em{ -webkit-text-fill-color:var(--accent); background:none; }
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{ opacity:1 !important; animation:none !important; }
+    .stage[data-state="in"] .node,
+    .stage[data-state="in"] .draw,
+    .stage[data-state="in"] .fade-dot{ animation:none !important; }
+  }
+</style>
+</head>
+<body data-theme="graphite">
+  <div class="viewport">
+    <div class="stage" id="stage" data-state="in">
+      <div class="slide">
+        <div class="kicker anim"><span>DSH MEMORY TREE</span><span class="idx">/ 01 · STYLE SAMPLE</span></div>
+
+        <h1 class="anim">让 Agent <em>记住</em>跨会话的经验</h1>
+        <p class="lead anim">
+          AST 结构化 · 向量召回 · 分层落盘 · 进程隔离<br />
+          <b>会话结束不等于记忆结束</b>——把上下文变成可继承的资产。
+        </p>
+
+        <div class="diagram anim">
+          <svg viewBox="0 0 980 250" role="img" aria-label="捕获、索引、召回三步流程图">
+            <g class="node" style="--d:180ms">
+              <rect class="node-box" x="40" y="66" width="230" height="118" rx="14" />
+              <text class="node-tag" x="64" y="102">01 · CAPTURE</text>
+              <text class="node-head" x="64" y="134">捕获</text>
+              <text class="node-sub" x="64" y="160">session/event → buffer</text>
+            </g>
+            <g class="node" style="--d:320ms">
+              <rect class="node-box" x="375" y="66" width="230" height="118" rx="14" />
+              <text class="node-tag" x="399" y="102">02 · INDEX</text>
+              <text class="node-head" x="399" y="134">结构化 + 向量</text>
+              <text class="node-sub" x="399" y="160">AST nodes · 1024d</text>
+            </g>
+            <g class="node" style="--d:460ms">
+              <rect class="node-box" x="710" y="66" width="230" height="118" rx="14" />
+              <text class="node-tag" x="734" y="102">03 · RECALL</text>
+              <text class="node-head" x="734" y="134">分层检索</text>
+              <text class="node-sub" x="734" y="160">hybrid · hot/warm/cold</text>
+            </g>
+            <path class="wire" d="M270 125 H375" />
+            <path class="wire draw" style="--d:600ms" d="M270 125 C300 125, 320 125, 375 125" />
+            <path class="wire" d="M605 125 H710" />
+            <path class="wire draw" style="--d:720ms" d="M605 125 C635 125, 655 125, 710 125" />
+            <circle class="dot fade-dot" cx="322" cy="125" r="3.5" style="--d:900ms" />
+            <circle class="dot fade-dot" cx="657" cy="125" r="3.5" style="--d:1020ms" />
+          </svg>
+        </div>
+
+        <div class="metrics anim">
+          <div class="metric">
+            <div class="k">documents</div>
+            <div class="v"><span class="num" data-count="13">13</span></div>
+            <div class="n">已归档的会话文档</div>
+          </div>
+          <div class="metric">
+            <div class="k">nodes</div>
+            <div class="v"><span class="num" data-count="73">73</span></div>
+            <div class="n">可寻址的 AST 节点</div>
+          </div>
+          <div class="metric">
+            <div class="k">recall p50</div>
+            <div class="v"><span class="num" data-count="12">12</span><small>ms</small></div>
+            <div class="n">本机 1024 维检索（1k 节点）</div>
+          </div>
+        </div>
+
+        <div class="foot anim">
+          <span>CAPTURE → STRUCTURE → EMBED → STORE → RECALL</span>
+          <span class="tag" id="themeName">GRAPHITE TERMINAL</span>
+          <span>02 / 14</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar" role="toolbar" aria-label="风格切换与动效控制">
+    <button data-theme-btn="graphite" aria-pressed="true">A 石墨终端</button>
+    <button data-theme-btn="paper" aria-pressed="false">B 纸本档案</button>
+    <button data-theme-btn="synapse" aria-pressed="false">C 神经雾</button>
+    <span class="sep"></span>
+    <button id="replay">重播入场</button>
+    <button id="exitAnim">演示退场</button>
+    <span class="sep"></span>
+    <span class="hint">按 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 切换 · <kbd>R</kbd> 重播 · <kbd>O</kbd> 退场</span>
+  </div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const themeName = document.getElementById('themeName');
+  const NAMES = { graphite: 'GRAPHITE TERMINAL', paper: 'PAPER LEDGER', synapse: 'SYNAPSE MIST' };
+  const anims = [...stage.querySelectorAll('.anim')];
+  const nodes = [...stage.querySelectorAll('.node, .draw, .fade-dot')];
+
+  let running = 0;
+
+  function layoutDelays() {
+    anims.forEach((el, i) => el.style.setProperty('--d', (i * 70) + 'ms'));
+    anims.forEach((el, i) => el.style.setProperty('--do', ((anims.length - 1 - i) * 45) + 'ms'));
+    nodes.forEach((el, i) => {
+      if (!el.style.getPropertyValue('--d')) el.style.setProperty('--d', (180 + i * 90) + 'ms');
+    });
+  }
+
+  function countUp() {
+    const values = [...stage.querySelectorAll('.num[data-count]')];
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    for (const el of values) {
+      const target = Number(el.dataset.count || 0);
+      if (reduced) { el.textContent = String(target); continue; }
+      const start = performance.now();
+      const dur = 620;
+      const tick = (now) => {
+        const t = Math.min(1, (now - start) / dur);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const value = Math.round(target * eased);
+        el.textContent = String(value);
+        if (t < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
+  function play() {
+    const run = ++running;
+    stage.dataset.state = 'out';
+    setTimeout(() => {
+      if (run !== running) return;
+      stage.dataset.state = 'in';
+      countUp();
+    }, 320);
+  }
+
+  function setTheme(name) {
+    if (!NAMES[name]) return;
+    document.body.dataset.theme = name;
+    themeName.textContent = NAMES[name];
+    document.querySelectorAll('[data-theme-btn]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.themeBtn === name));
+    });
+    play();
+  }
+
+  layoutDelays();
+  const hashTheme = location.hash.replace('#', '');
+  if (NAMES[hashTheme]) {
+    document.body.dataset.theme = hashTheme;
+    themeName.textContent = NAMES[hashTheme];
+    document.querySelectorAll('[data-theme-btn]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.themeBtn === hashTheme));
+    });
+  }
+  play();
+
+  document.querySelectorAll('[data-theme-btn]').forEach((btn) => {
+    btn.addEventListener('click', () => setTheme(btn.dataset.themeBtn));
+  });
+  document.getElementById('replay').addEventListener('click', play);
+  document.getElementById('exitAnim').addEventListener('click', () => {
+    stage.dataset.state = 'out';
+  });
+
+  window.addEventListener('keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key === '1') setTheme('graphite');
+    else if (key === '2') setTheme('paper');
+    else if (key === '3') setTheme('synapse');
+    else if (key === 'r') play();
+    else if (key === 'o') stage.dataset.state = 'out';
+    else if (key === 'f') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.();
+    }
+  });
+})();
+</script>
+</body>
+</html>

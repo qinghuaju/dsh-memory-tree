@@ -1,0 +1,14 @@
+# Bundle patch: inserted automatically when this package is added to a DSH profile.
+#
+# A "bundle" is a package whose patch file is appended after the profile's own
+# patch. Adding `dsh-memory-tree` to `dsh.profile.bundles` therefore mounts the
+# plugin without editing the profile by hand.
+#
+# Keys never live here: the embedding credential comes from
+# $DSH_HOME/memory-tree/credentials.json, MEMORY_TREE_API_KEY, or the DSH
+# credential store. See docs/DEPLOY.md.
+- insert:
+    - id: dsh-memory-tree
+      name: './src/plugin.mjs'
+      config:
+        enabled: true

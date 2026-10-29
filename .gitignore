@@ -1,0 +1,31 @@
+# dependencies / dev links
+node_modules/
+.pnpm-store/
+
+# local runtime data (NEVER commit)
+data/
+.local/
+*.db
+*.db-wal
+*.db-shm
+memory.db*
+local/
+credentials.json
+.env
+.env.*
+!.env.example
+
+# logs / temp
+*.log
+.tmp/
+dist/
+coverage/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# vendor reference material (kept locally, not part of the package)
+pollinationsApi.md

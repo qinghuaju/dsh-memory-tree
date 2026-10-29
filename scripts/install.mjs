@@ -1,0 +1,259 @@
+#!/usr/bin/env node
+/**
+ * Install / uninstall the memory plugin in a DSH profile.
+ *
+ * Two deployment shapes:
+ *
+ *   dev (default)
+ *     writes `<profile>/dsh-memory-tree.plugin.mjs`, an ESM shim that re-exports
+ *     this checkout. Best while developing; the checkout must stay in place.
+ *
+ *   copy (`--copy-to [dir]`)
+ *     copies the package (src/, package.json, docs, README, LICENSE) into the
+ *     profile and points the profile at that copy:
+ *       - inside `<profile>/node_modules/…` → bare package name (recommended)
+ *       - anywhere else                    → a shim with an absolute file URL
+ *     Best for deploying to another machine, or to freeze the version DSH loads.
+ *
+ * Everything is idempotent and backs up `cordis.patch.yml` before editing.
+ *
+ * Usage:
+ *   node scripts/install.mjs --dry-run
+ *   node scripts/install.mjs
+ *   node scripts/install.mjs --copy-to
+ *   node scripts/install.mjs --copy-to "D:\\dsh-plugins\\dsh-memory-tree"
+ *   node scripts/install.mjs --profile "C:\\Users\\me\\.dsh\\profiles\\desktop"
+ *   node scripts/install.mjs --uninstall
+ */
+
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const PLUGIN_ID = 'dsh-memory-tree';
+const SHIM_NAME = 'dsh-memory-tree.plugin.mjs';
+const PACKAGE_FILES = ['src', 'docs', 'package.json', 'README.md', 'README.zh.md', 'LICENSE', 'CHANGELOG.md'];
+
+const flags = parseFlags(process.argv.slice(2));
+const here = dirname(dirname(fileURLToPath(import.meta.url)));
+const dshHome = expand(process.env.DSH_HOME || join(homedir(), '.dsh'));
+const profileDir = flags.profile ? resolve(String(flags.profile)) : join(dshHome, 'profiles', 'web');
+const patchPath = join(profileDir, 'cordis.patch.yml');
+const shimPath = join(profileDir, SHIM_NAME);
+
+if (!existsSync(profileDir)) {
+  fail(`profile not found: ${profileDir}\nUse --profile <dir> or set DSH_HOME.`);
+}
+
+// The desktop app and the `dsh web` CLI use different profiles. Warn when the
+// default (web) is chosen while a desktop profile exists, because a plugin
+// installed into the inactive profile simply never loads.
+if (!flags.profile) {
+  const desktop = join(dshHome, 'profiles', 'desktop');
+  if (existsSync(desktop)) {
+    console.log(`note: found both profiles; installing into ${profileDir}`);
+    console.log(`      the desktop app loads ${desktop} — use --profile "${desktop}" for it.`);
+  }
+}
+
+const copyTarget = flags['copy-to'] === undefined && !flags.package
+  ? ''
+  : flags['copy-to'] && flags['copy-to'] !== true
+    ? resolve(String(flags['copy-to']))
+    : join(profileDir, 'node_modules', PLUGIN_ID);
+
+if (flags.uninstall) {
+  uninstall();
+  process.exit(0);
+}
+
+install();
+
+function install() {
+  const copied = Boolean(copyTarget);
+  let entryName;
+
+  if (copied) {
+    const insideNodeModules = copyTarget.replace(/\\/g, '/').includes('/node_modules/');
+    const pluginEntry = join(copyTarget, 'src', 'plugin.mjs');
+    entryName = insideNodeModules ? PLUGIN_ID : `./${SHIM_NAME}`;
+    if (!flags['dry-run']) {
+      copyPackage(copyTarget);
+      if (!insideNodeModules) writeShim(pathToFileURL(pluginEntry).href);
+    } else {
+      console.log(`--- would copy ${PACKAGE_FILES.join(', ')} → ${copyTarget}`);
+      if (!insideNodeModules) console.log(`--- would write ${shimPath} (shim → ${pluginEntry})`);
+    }
+  } else {
+    entryName = `./${SHIM_NAME}`;
+    const url = pathToFileURL(join(here, 'src', 'plugin.mjs')).href;
+    if (flags['dry-run']) {
+      console.log(`--- would write ${shimPath}`);
+      console.log(`export { default, apply, Config, inject, name } from '${url}';`);
+    } else {
+      writeShim(url);
+    }
+  }
+
+  patchProfile(entryName);
+
+  const dataDir = join(dshHome, 'memory-tree');
+  console.log('');
+  console.log('Next steps:');
+  console.log(`1. Put the embedding key in ${join(dataDir, 'credentials.json')} as {"apiKey":"..."}`);
+  console.log('   (or export MEMORY_TREE_API_KEY before starting DSH).');
+  console.log('2. Restart DeepSeek Harness.');
+  console.log(`3. Verify: ask the agent to call mem_stats (database: ${join(dataDir, 'memory.db')}).`);
+  console.log('');
+  console.log('Uninstall: node scripts/install.mjs --uninstall');
+}
+
+function copyPackage(target) {
+  mkdirSync(target, { recursive: true });
+  for (const name of PACKAGE_FILES) {
+    const source = join(here, name);
+    if (!existsSync(source)) continue;
+    const destination = join(target, name);
+    cpSync(source, destination, {
+      recursive: true,
+      filter: (path) => !path.includes(`${join('node_modules')}`) && !path.endsWith('.db'),
+    });
+  }
+  console.log(`copied package → ${target}`);
+}
+
+function writeShim(url) {
+  writeFileSync(
+    shimPath,
+    [
+      '/**',
+      ' * Auto-generated by dsh-memory-tree installer.',
+      ` * Re-exports the plugin from: ${url}`,
+      ' * Delete this file (and the cordis.patch.yml entry) to uninstall.',
+      ' */',
+      `export { default, apply, Config, inject, name } from '${url}';`,
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  console.log(`shim: ${shimPath}`);
+}
+
+function patchProfile(entryName) {
+  const patch = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '';
+  if (patch.includes(`id: ${PLUGIN_ID}`)) {
+    console.log(`entry already present: ${patchPath}`);
+    return;
+  }
+  const entryYaml = [
+    '',
+    '# dsh-memory-tree — long-term memory (SQLite + embeddings, project scoped, tiered files).',
+    '# Remove this entry and the shim/package to uninstall.',
+    '- insert:',
+    `    - id: ${PLUGIN_ID}`,
+    `      name: '${entryName}'`,
+    '      config:',
+    '        enabled: true',
+    '        capture:',
+    '          enabled: true',
+    '        recall:',
+    '          autoInject: true',
+    '        storage:',
+    '          tiered: true',
+    '          hotDays: 30',
+    '          warmDays: 180',
+    '        # 首次使用前写入 API key（二选一）：',
+    '        #   $DSH_HOME/memory-tree/credentials.json → {"apiKey":"..."}',
+    '        #   或环境变量 MEMORY_TREE_API_KEY',
+    '',
+  ].join('\n');
+
+  if (flags['dry-run']) {
+    console.log(`--- would append to ${patchPath}`);
+    console.log(entryYaml);
+    return;
+  }
+
+  if (existsSync(patchPath)) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backup = `${patchPath}.bak-memory-tree-${stamp}`;
+    copyFileSync(patchPath, backup);
+    console.log(`backup: ${backup}`);
+  }
+  const needsNewline = patch.length > 0 && !patch.endsWith('\n');
+  writeFileSync(patchPath, `${patch}${needsNewline ? '\n' : ''}${entryYaml}`, 'utf8');
+  console.log(`patched: ${patchPath}`);
+}
+
+function uninstall() {
+  const changes = [];
+  if (existsSync(shimPath)) {
+    if (!flags['dry-run']) writeFileSync(shimPath, '// uninstalled\n', 'utf8');
+    changes.push(`neutralized ${shimPath}`);
+  }
+  for (const candidate of [copyTarget, join(profileDir, 'node_modules', PLUGIN_ID)]) {
+    if (!candidate || !existsSync(candidate)) continue;
+    if (flags['dry-run']) {
+      console.log(`--- would remove ${candidate}`);
+      continue;
+    }
+    rmSync(candidate, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    changes.push(`removed ${candidate}`);
+  }
+  if (existsSync(patchPath)) {
+    const text = readFileSync(patchPath, 'utf8');
+    const marker = '# dsh-memory-tree —';
+    const index = text.indexOf(marker);
+    if (index >= 0) {
+      const cleaned = `${text.slice(0, index).trimEnd()}\n`;
+      if (flags['dry-run']) {
+        console.log('--- would rewrite patch as:');
+        console.log(cleaned);
+      } else {
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        copyFileSync(patchPath, `${patchPath}.bak-uninstall-${stamp}`);
+        writeFileSync(patchPath, cleaned, 'utf8');
+        changes.push(`removed entry from ${patchPath}`);
+      }
+    }
+  }
+  console.log(changes.length > 0 ? changes.join('\n') : 'nothing to uninstall');
+  console.log('restart DeepSeek Harness to unload the plugin.');
+}
+
+function parseFlags(argv) {
+  const out = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (!arg.startsWith('--')) continue;
+    const key = arg.slice(2);
+    const next = argv[index + 1];
+    if (next && !next.startsWith('--')) {
+      out[key] = next;
+      index += 1;
+    } else {
+      out[key] = true;
+    }
+  }
+  return out;
+}
+
+function expand(path) {
+  if (path === '~') return homedir();
+  if (path.startsWith('~/') || path.startsWith('~\\')) return join(homedir(), path.slice(2));
+  return path;
+}
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}

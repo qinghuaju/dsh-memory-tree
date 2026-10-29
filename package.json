@@ -1,0 +1,76 @@
+{
+  "name": "dsh-memory-tree",
+  "version": "0.3.0",
+  "description": "AST soft-decision-tree long-term memory for DeepSeek Harness (DSH): SQLite + embeddings, project-scoped, cross-session recall.",
+  "type": "module",
+  "main": "./src/plugin.mjs",
+  "exports": {
+    ".": "./src/plugin.mjs",
+    "./engine": "./src/engine/index.mjs"
+  },
+  "files": [
+    "src",
+    "docs",
+    "scripts",
+    "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "LICENSE",
+    "cordis.patch.yml",
+    "market"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": ">=0.1.0",
+    "@deepseek-ai/dsh-tools": ">=0.1.0",
+    "@deepseek-ai/schemastery": ">=3.18.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-llm": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    },
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "selftest": "node scripts/selftest.mjs",
+    "dryrun": "node scripts/dryrun-plugin.mjs",
+    "live": "node scripts/selftest.mjs --live",
+    "demo": "node scripts/demo.mjs",
+    "inspect": "node scripts/inspect.mjs",
+    "bench": "node scripts/bench.mjs",
+    "market": "node scripts/market-index.mjs",
+    "market:check": "node scripts/check-market.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "long-term-memory",
+    "sqlite",
+    "embedding",
+    "ast",
+    "rag"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "isomorphic-git": "^1.25.10"
+  }
+}

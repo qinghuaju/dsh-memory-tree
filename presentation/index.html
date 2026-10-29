@@ -1,0 +1,1149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<title>dsh-memory-tree · 让 Agent 记住跨会话的经验</title>
+<style>
+  :root{
+    --bg:#EAE3D4; --paper:#FFFDF8; --paper-2:#FBF6EA;
+    --ink:#17140F; --ink-2:#5D5548; --ink-3:#8A8071;
+    --red:#D6452F; --green:#2F6B5A; --ochre:#C98A2E;
+    --line:rgba(23,20,15,.18); --line-2:rgba(23,20,15,.09);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","华文宋体","SimSun","宋体",serif;
+    --sans:"Noto Sans SC","Source Han Sans SC","Microsoft YaHei UI","PingFang SC",system-ui,sans-serif;
+    --mono:"JetBrains Mono","Cascadia Code","Cascadia Mono",Consolas,"Courier New",monospace;
+    --ease:cubic-bezier(.2,.9,.25,1.05);
+    --ease-out:cubic-bezier(.2,.7,.2,1);
+    --in:520ms; --out:280ms;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    overflow:hidden;-webkit-font-smoothing:antialiased;
+  }
+  .viewport{position:fixed;inset:0;display:grid;place-items:center;padding:3vh 3vw 9.5vh}
+  .stage{
+    position:relative;width:min(96vw,1720px);aspect-ratio:16/9;container-type:inline-size;
+    border-radius:8px;overflow:hidden;
+    background:radial-gradient(125% 110% at 50% -10%,#FFFDF8 0%,#F7F2E7 52%,#F1EADC 100%);
+    box-shadow:0 36px 80px rgba(60,45,25,.16),0 2px 0 rgba(255,255,255,.6) inset,0 0 0 1px rgba(23,20,15,.08);
+  }
+  .stage::before{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+    background-image:radial-gradient(rgba(23,20,15,.06) 1px,transparent 1px);
+    background-size:5.4cqw 5.4cqw;opacity:.42;
+  }
+  .stage::after{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+    background:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.5'/></svg>"),
+      radial-gradient(72% 62% at 50% 42%,transparent 52%,rgba(23,20,15,.055) 100%);
+    background-blend-mode:multiply,normal;opacity:.055;
+  }
+
+  /* ── 页面通用 ─────────────────────────────────────────────────────── */
+  .slide{
+    position:absolute;inset:0;z-index:2;padding:4.4cqw 5.2cqw 3.2cqw;
+    display:flex;flex-direction:column;
+    opacity:0;visibility:hidden;pointer-events:none;
+  }
+  .slide.is-active{opacity:1;visibility:visible;pointer-events:auto}
+  .kicker{
+    display:flex;align-items:center;gap:.8cqw;
+    font-family:var(--mono);font-size:.92cqw;letter-spacing:.2em;color:var(--red);
+    text-transform:uppercase;
+  }
+  .kicker::before{content:"";width:2cqw;height:1px;background:currentColor;opacity:.7}
+  .kicker .n{color:var(--ink-3)}
+  h1{
+    margin:1.8cqw 0 0;font-family:var(--serif);font-weight:700;font-size:4.6cqw;
+    line-height:1.16;letter-spacing:-.01em;
+  }
+  h2{
+    margin:1.4cqw 0 0;font-family:var(--serif);font-weight:700;font-size:2.95cqw;
+    line-height:1.24;letter-spacing:-.005em;max-width:64cqw;
+  }
+  h2 em,h1 em{font-style:normal;color:var(--red)}
+  .lead{margin:1.1cqw 0 0;font-size:1.22cqw;line-height:1.8;color:var(--ink-2);max-width:58cqw}
+  .lead b{color:var(--ink);font-weight:600}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .accent{color:var(--red)}
+  .green{color:var(--green)}
+
+  .card{
+    background:var(--paper);border:1px solid var(--line);border-radius:5px;
+    box-shadow:0 10px 22px rgba(60,45,25,.07);
+  }
+  .chip{
+    display:inline-flex;align-items:center;gap:.5cqw;padding:.5cqw .85cqw;
+    border:1px solid var(--line);border-radius:3px;background:var(--paper);
+    font-family:var(--mono);font-size:.92cqw;color:var(--ink);white-space:nowrap;
+  }
+  .chip .dot{width:.5cqw;height:.5cqw;border-radius:50%;background:var(--green)}
+  .tag{
+    display:inline-block;padding:.28cqw .6cqw;border:1px solid var(--line);
+    font-family:var(--mono);font-size:.82cqw;letter-spacing:.08em;color:var(--ink-2);
+  }
+  .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1.8cqw;margin-top:1.8cqw;padding-top:1.15cqw;border-top:1px solid var(--line-2)}
+  .strip .k{font-family:var(--mono);font-size:.74cqw;letter-spacing:.14em;color:var(--ink-3)}
+  .strip .t{margin-top:.35cqw;font-size:.92cqw;line-height:1.62;color:var(--ink-2)}
+  .strip .t b{color:var(--ink);font-weight:600}
+  .foot{
+    margin-top:auto;display:flex;align-items:baseline;justify-content:space-between;
+    padding-top:1.6cqw;border-top:1px solid var(--line-2);
+    font-family:var(--mono);font-size:.82cqw;letter-spacing:.06em;color:var(--ink-3);
+  }
+  .foot .pn{font-size:.92cqw;color:var(--ink-2)}
+  .note{font-size:.92cqw;color:var(--ink-3);line-height:1.7}
+  .hr{height:1px;background:var(--line-2);margin:1.6cqw 0}
+
+  /* ── 动画 ─────────────────────────────────────────────────────────── */
+  .a,.a-fade{opacity:0;will-change:opacity,transform}
+  .slide[data-anim="in"] .a{animation:drop var(--in) var(--ease) both;animation-delay:var(--d,0ms)}
+  .slide[data-anim="in"] .a-fade{animation:soft var(--in) var(--ease-out) both;animation-delay:var(--d,0ms)}
+  .slide[data-anim="out"] .a{animation:lift var(--out) cubic-bezier(.4,0,.9,1) both;animation-delay:var(--do,0ms)}
+  .slide[data-anim="out"] .a-fade{animation:softOut var(--out) ease-in both;animation-delay:var(--do,0ms)}
+  @keyframes drop{
+    0%{opacity:0;transform:translateY(-15px) scale(.995);filter:blur(3px)}
+    100%{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
+  }
+  @keyframes soft{from{opacity:0;filter:blur(2px)}to{opacity:1;filter:blur(0)}}
+  @keyframes lift{
+    from{opacity:1;transform:translateY(0);filter:blur(0)}
+    to{opacity:0;transform:translateY(-13px);filter:blur(2px)}
+  }
+  @keyframes softOut{from{opacity:1}to{opacity:0;filter:blur(2px)}}
+  @keyframes draw{from{stroke-dashoffset:var(--len,900)}to{stroke-dashoffset:0}}
+  @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .draw{stroke-dasharray:var(--len,900);stroke-dashoffset:var(--len,900)}
+  .slide.is-active .draw{animation:draw 1.5s var(--ease-out) both;animation-delay:var(--d,300ms)}
+  .slide.is-active .chart .line{animation:draw 1.5s var(--ease-out) both;animation-delay:var(--d,300ms)}
+  .slide.is-active .pop{animation:pop .5s var(--ease) both;animation-delay:var(--d,300ms)}
+  .slide.is-active .fill{width:var(--w,0);transition:width 1.1s var(--ease-out);transition-delay:var(--d,300ms)}
+
+  /* ── 封面 ─────────────────────────────────────────────────────────── */
+  .cover{justify-content:center}
+  .cover-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:3.5cqw;align-items:center}
+  .badges{display:flex;gap:.7cqw;flex-wrap:wrap;margin-top:1.8cqw}
+  .badge{
+    font-family:var(--mono);font-size:.82cqw;letter-spacing:.08em;color:var(--ink-2);
+    border:1px solid var(--line);padding:.35cqw .65cqw;border-radius:2px;background:var(--paper-2);
+  }
+  .cover-meta{margin-top:2.2cqw;font-family:var(--mono);font-size:.9cqw;color:var(--ink-3);letter-spacing:.1em}
+  .hero{position:relative;height:34cqw;display:flex;align-items:center;justify-content:center}
+  .hcard{
+    position:absolute;width:20cqw;height:26cqw;background:var(--paper);
+    border:1px solid var(--line);border-radius:4px;box-shadow:0 16px 30px rgba(60,45,25,.14);
+    background-image:repeating-linear-gradient(180deg,transparent 0 2.1cqw,rgba(23,20,15,.10) 2.1cqw 2.16cqw);
+    background-position:0 3.2cqw;
+  }
+  .hcard.c1{transform:rotate(-7deg) translate(-4.2cqw,1.4cqw)}
+  .hcard.c2{transform:rotate(2deg) translate(0,-1.2cqw)}
+  .hcard.c3{transform:rotate(8deg) translate(4.6cqw,1.8cqw);background-image:repeating-linear-gradient(180deg,transparent 0 2.1cqw,rgba(23,20,15,.10) 2.1cqw 2.16cqw)}
+  .hero-thread{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .seal{
+    position:absolute;right:2.2cqw;bottom:1.4cqw;width:6.4cqw;height:6.4cqw;border-radius:50%;
+    border:2px solid var(--red);color:var(--red);display:grid;place-items:center;
+    font-family:var(--serif);font-size:1.5cqw;font-weight:700;letter-spacing:.06em;
+    transform:rotate(-9deg);opacity:.86;
+    background:radial-gradient(circle at 40% 35%,rgba(214,69,47,.10),transparent 65%);
+  }
+  .seal::after{content:"";position:absolute;inset:.42cqw;border:1px solid var(--red);border-radius:50%;opacity:.55}
+  .tape{position:absolute;width:6.4cqw;height:1.5cqw;background:rgba(201,138,46,.32);border:1px solid rgba(201,138,46,.35);transform:rotate(-6deg)}
+  .tape.t1{left:6.2cqw;top:4.4cqw}
+  .tape.t2{right:6.6cqw;bottom:9.2cqw;transform:rotate(5deg)}
+
+  /* ── 时间轴（页2） ───────────────────────────────────────────────── */
+  .timeline{position:relative;margin-top:2.4cqw;display:grid;grid-template-columns:repeat(4,1fr);gap:1.4cqw}
+  .timeline::before{content:"";position:absolute;left:1%;right:1%;top:2.1cqw;height:1px;background:var(--line);z-index:0}
+  .tnode{position:relative;z-index:1;padding-top:3.1cqw}
+  .tpoint{position:absolute;top:1.7cqw;left:0;width:.8cqw;height:.8cqw;border-radius:50%;background:var(--ink);box-shadow:0 0 0 4px var(--paper)}
+  .tcard{padding:1.3cqw 1.2cqw;min-height:9.6cqw}
+  .tcard .when{font-family:var(--mono);font-size:.82cqw;color:var(--ink-3);letter-spacing:.08em}
+  .tcard .what{font-family:var(--serif);font-size:1.28cqw;font-weight:600;margin-top:.6cqw;line-height:1.45}
+  .tcard .why{font-size:.92cqw;color:var(--ink-2);margin-top:.6cqw;line-height:1.65}
+  .tcard.bad{border-color:rgba(214,69,47,.45);background:linear-gradient(180deg,rgba(214,69,47,.05),var(--paper))}
+  .tcard.bad .when{color:var(--red)}
+  .quote-band{
+    margin-top:2.2cqw;padding:1.5cqw 1.8cqw;border-left:3px solid var(--red);
+    background:var(--paper-2);font-family:var(--serif);font-size:1.35cqw;line-height:1.7;
+  }
+  .quote-band small{display:block;margin-top:.5cqw;font-family:var(--mono);font-size:.82cqw;color:var(--ink-3);letter-spacing:.06em}
+
+  /* ── 对比（页3） ─────────────────────────────────────────────────── */
+  .vs{display:grid;grid-template-columns:1fr 5.4cqw 1fr;gap:1.2cqw;align-items:stretch;margin-top:2.2cqw}
+  .vs-col{padding:1.6cqw 1.5cqw}
+  .vs-col h3{margin:0;font-family:var(--serif);font-size:1.55cqw;font-weight:700}
+  .vs-col .sub{font-family:var(--mono);font-size:.82cqw;letter-spacing:.1em;color:var(--ink-3);margin-top:.4cqw}
+  .vs-row{display:flex;justify-content:space-between;gap:1cqw;padding:.72cqw 0;border-bottom:1px dashed var(--line-2);font-size:.98cqw}
+  .vs-row:last-child{border-bottom:0}
+  .vs-row .k{color:var(--ink-3);font-size:.9cqw}
+  .vs-row .v{font-family:var(--mono);font-size:.92cqw;text-align:right}
+  .vs-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6cqw;color:var(--ink-3)}
+  .vs-mid .arrow{font-family:var(--mono);font-size:1.6cqw;color:var(--red);line-height:1}
+  .vs-mid .lbl{font-family:var(--mono);font-size:.72cqw;letter-spacing:.12em;writing-mode:vertical-rl;text-orientation:mixed;color:var(--ink-3)}
+
+  /* ── 架构（页4） ─────────────────────────────────────────────────── */
+  .diagram{margin-top:1.6cqw;flex:1;min-height:0;display:flex;align-items:center}
+  .diagram svg{width:100%;height:100%;display:block;overflow:visible}
+  .sv-box{fill:var(--paper);stroke:var(--line);stroke-width:1.1}
+  .sv-box-dash{fill:rgba(255,253,248,.6);stroke:var(--line);stroke-width:1.1;stroke-dasharray:5 5}
+  .sv-title{font-family:var(--serif);font-weight:700;font-size:15px;fill:var(--ink)}
+  .sv-text{font-family:var(--mono);font-size:10.5px;fill:var(--ink-2);letter-spacing:.02em}
+  .sv-dim{font-family:var(--mono);font-size:9.5px;fill:var(--ink-3);letter-spacing:.08em}
+  .sv-acc{font-family:var(--mono);font-size:10px;fill:var(--red);letter-spacing:.1em}
+  .sv-green{fill:var(--green)}
+  .sv-line{stroke:rgba(23,20,15,.3);stroke-width:1.2;fill:none}
+  .sv-red{stroke:var(--red);stroke-width:1.2;fill:none}
+  .sv-dash{stroke:var(--red);stroke-width:1.2;fill:none;stroke-dasharray:4 4}
+
+  /* ── 捕获流程（页5） ─────────────────────────────────────────────── */
+  .flow{display:flex;align-items:stretch;gap:.7cqw;margin-top:2.2cqw;flex-wrap:nowrap}
+  .fstep{flex:1;padding:1.2cqw 1cqw;min-height:9.4cqw}
+  .fstep .n{font-family:var(--mono);font-size:.78cqw;color:var(--red);letter-spacing:.1em}
+  .fstep .t{font-family:var(--serif);font-size:1.18cqw;font-weight:600;margin-top:.5cqw}
+  .fstep .d{font-family:var(--mono);font-size:.82cqw;color:var(--ink-2);margin-top:.5cqw;line-height:1.55}
+  .farrow{align-self:center;color:var(--ink-3);font-family:var(--mono);font-size:1.1cqw}
+  .excl{margin-top:1.6cqw;display:flex;gap:1.6cqw;align-items:flex-start}
+  .excl .card{flex:1;padding:1.2cqw 1.3cqw}
+  .excl h4{margin:0 0 .7cqw;font-family:var(--mono);font-size:.82cqw;letter-spacing:.12em;color:var(--ink-3);font-weight:400}
+  .excl ul{margin:0;padding-left:1.1cqw;font-size:.92cqw;line-height:1.85;color:var(--ink-2)}
+  .excl li code{font-family:var(--mono);font-size:.86cqw;color:var(--ink)}
+
+  /* ── 树（页6） ───────────────────────────────────────────────────── */
+  .tree-wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:2.2cqw;margin-top:1.4cqw;flex:1;min-height:0}
+  .tree-wrap svg{width:100%;height:100%}
+  .tree-side{display:flex;flex-direction:column;justify-content:center;gap:1.1cqw}
+  .path-pill{
+    font-family:var(--mono);font-size:.86cqw;padding:.7cqw .9cqw;border:1px solid var(--line);
+    background:var(--paper-2);border-left:3px solid var(--red);color:var(--ink);word-break:break-all;
+  }
+  .rule{display:flex;gap:.7cqw;font-size:.95cqw;line-height:1.6}
+  .rule .b{font-family:var(--mono);font-size:.82cqw;color:var(--green);min-width:4.2cqw;padding-top:.1cqw}
+
+  /* ── 分层（页8） ─────────────────────────────────────────────────── */
+  .tiers{display:grid;grid-template-columns:1.15fr .85fr;gap:2.2cqw;margin-top:1.4cqw;flex:1;min-height:0}
+  .tiers svg{width:100%;height:100%}
+  .tier-list{display:flex;flex-direction:column;justify-content:center;gap:.9cqw}
+  .tier-row{display:flex;align-items:center;gap:.9cqw;padding:.75cqw .9cqw;border:1px solid var(--line);background:var(--paper);border-radius:4px}
+  .tier-row .sw{width:.7cqw;height:2.2cqw;border-radius:1px}
+  .tier-row .nm{font-family:var(--mono);font-size:.9cqw;width:5.2cqw}
+  .tier-row .ds{font-size:.86cqw;color:var(--ink-2)}
+
+  /* ── 打分（页9） ─────────────────────────────────────────────────── */
+  .score{display:grid;grid-template-columns:1.05fr .95fr;gap:2.4cqw;margin-top:1.8cqw;flex:1;min-height:0}
+  .formula{font-family:var(--mono);font-size:1.05cqw;line-height:2;color:var(--ink)}
+  .formula .op{color:var(--ink-3)}
+  .bar{display:flex;align-items:center;gap:.8cqw;margin-top:.85cqw;font-family:var(--mono);font-size:.86cqw}
+  .bar .lb{width:9.2cqw;color:var(--ink-2)}
+  .bar .track{flex:1;height:.55cqw;background:rgba(23,20,15,.08);border-radius:2px;overflow:hidden}
+  .bar .fill{display:block;height:100%;width:0;background:var(--ink)}
+  .bar .fill.g{background:var(--green)}
+  .bar .fill.r{background:var(--red)}
+  .bar .vv{width:4.2cqw;text-align:right;color:var(--ink-3)}
+  .steps{display:flex;flex-direction:column;gap:.75cqw;justify-content:center}
+  .rk{display:flex;gap:.9cqw;align-items:baseline;font-size:.9cqw;color:var(--ink-2);padding:.38cqw 0;border-bottom:1px dashed var(--line-2)}
+  .rk:last-child{border-bottom:0}
+  .rk span{font-family:var(--mono);color:var(--red);min-width:3.2cqw}
+  .step{display:flex;gap:.8cqw;padding:.85cqw 1cqw;border:1px solid var(--line);background:var(--paper);border-radius:4px}
+  .step .i{font-family:var(--mono);font-size:.78cqw;color:var(--red);min-width:1.6cqw;padding-top:.15cqw}
+  .step .tx{font-size:.95cqw;line-height:1.6;color:var(--ink-2)}
+  .step .tx b{color:var(--ink);font-weight:600}
+
+  /* ── 注入（页10） ────────────────────────────────────────────────── */
+  .inject{display:grid;grid-template-columns:1.05fr .95fr;gap:2.4cqw;margin-top:1.6cqw;flex:1;min-height:0}
+  .conv{display:flex;flex-direction:column;gap:.75cqw;justify-content:center}
+  .msg{padding:.85cqw 1.05cqw;border:1px solid var(--line);background:var(--paper);border-radius:4px;font-size:.95cqw;line-height:1.6;max-width:92%}
+  .msg.user{align-self:flex-start;background:var(--paper-2)}
+  .msg.ai{align-self:flex-end;background:#F4F7F3;border-color:rgba(47,107,90,.25)}
+  .msg.recall{
+    align-self:flex-start;border:1px dashed rgba(214,69,47,.55);border-left:3px solid var(--red);
+    background:rgba(214,69,47,.045);font-family:var(--mono);font-size:.82cqw;line-height:1.7;
+  }
+  .msg.recall .hd{color:var(--red);letter-spacing:.06em;margin-bottom:.35cqw}
+  .msg .lbl{font-family:var(--mono);font-size:.72cqw;color:var(--ink-3);letter-spacing:.1em;display:block;margin-bottom:.3cqw}
+  .safe-list{display:flex;flex-direction:column;gap:.7cqw;justify-content:center}
+  .safe{display:flex;gap:.75cqw;font-size:.95cqw;line-height:1.6;color:var(--ink-2)}
+  .safe .k{font-family:var(--mono);font-size:.8cqw;color:var(--green);min-width:5.4cqw;padding-top:.12cqw}
+
+  /* ── 工程（页11） ────────────────────────────────────────────────── */
+  .eng{display:grid;grid-template-columns:1.1fr .9fr;gap:2.2cqw;margin-top:1.2cqw;flex:1;min-height:0}
+  .eng svg{width:100%;height:100%}
+  .eng-side{display:flex;flex-direction:column;justify-content:center;gap:.8cqw}
+  .eng-item{display:flex;gap:.7cqw;font-size:.93cqw;line-height:1.6;color:var(--ink-2)}
+  .eng-item .i{font-family:var(--mono);font-size:.78cqw;color:var(--red);min-width:1.5cqw;padding-top:.12cqw}
+  .eng-item b{color:var(--ink)}
+
+  /* ── 数据（页12） ───────────────────────────────────────────────── */
+  .bench{display:grid;grid-template-columns:1.02fr .98fr;gap:2.4cqw;margin-top:1.6cqw;flex:1;min-height:0;align-items:start;align-content:start}
+  table.bt{width:100%;border-collapse:collapse;font-size:.95cqw;align-self:start}
+  table.bt th{
+    text-align:left;font-family:var(--mono);font-size:.78cqw;letter-spacing:.1em;color:var(--ink-3);
+    font-weight:400;padding:.55cqw .4cqw;border-bottom:1px solid var(--line)
+  }
+  table.bt td{padding:.62cqw .4cqw;border-bottom:1px dashed var(--line-2);font-family:var(--mono);font-size:.9cqw}
+  table.bt td.nm{font-family:var(--serif);font-size:1.02cqw}
+  table.bt tr.hl td{color:var(--red)}
+  .chart{display:flex;align-items:flex-start;justify-content:center;min-height:0}
+  .chart svg{width:100%;height:auto;max-height:100%}
+  .chart .axis{stroke:rgba(23,20,15,.35);stroke-width:1}
+  .chart .grid{stroke:rgba(23,20,15,.12);stroke-width:1;stroke-dasharray:3 5}
+  .chart .line{stroke:var(--red);stroke-width:2.2;fill:none;stroke-dasharray:var(--len,900);stroke-dashoffset:var(--len,900)}
+  .chart .pt{fill:var(--paper);stroke:var(--red);stroke-width:2}
+  .chart .lbl{font-family:var(--mono);font-size:9.5px;fill:var(--ink-2)}
+
+  /* ── 使用（页13） ───────────────────────────────────────────────── */
+  .term{
+    margin-top:1.8cqw;background:#1B1813;border-radius:6px;padding:1.3cqw 1.5cqw;
+    font-family:var(--mono);font-size:.92cqw;line-height:1.95;color:#EDE6D8;
+    box-shadow:0 16px 36px rgba(23,20,15,.22);border:1px solid rgba(255,255,255,.08);
+  }
+  .term .ln{white-space:pre;display:block}
+  .term .pf{color:#8FBF9F}
+  .term .cm{color:#D9A24B}
+  .term .ok{color:#9BD3B4}
+  .term .out{color:#B9B0A0}
+  .term .cur{display:inline-block;width:.55cqw;height:1.05cqw;background:#EDE6D8;vertical-align:-.15cqw;animation:blink 1.05s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .use-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:2cqw;margin-top:1.4cqw}
+  .tool{display:flex;gap:.7cqw;align-items:baseline;padding:.6cqw 0;border-bottom:1px dashed var(--line-2);font-size:.92cqw}
+  .tool .nm{font-family:var(--mono);font-size:.88cqw;color:var(--ink);min-width:8.4cqw}
+  .tool .ds{color:var(--ink-2)}
+
+  /* ── 路线（页14） ───────────────────────────────────────────────── */
+  .phase{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5cqw;margin-top:2.2cqw}
+  .ph{padding:1.5cqw 1.4cqw;position:relative;min-height:12.6cqw}
+  .ph .lv{font-family:var(--mono);font-size:.8cqw;letter-spacing:.12em;color:var(--red)}
+  .ph h3{margin:.6cqw 0 0;font-family:var(--serif);font-size:1.35cqw}
+  .ph p{margin:.7cqw 0 0;font-size:.9cqw;line-height:1.7;color:var(--ink-2)}
+  .ph.done{border-color:rgba(47,107,90,.4)}
+  .ph.done .lv{color:var(--green)}
+  .ph .st{position:absolute;top:1.2cqw;right:1.2cqw;font-family:var(--mono);font-size:.72cqw;padding:.22cqw .5cqw;border:1px solid var(--line);color:var(--ink-3)}
+  .closing{margin-top:2.2cqw;display:flex;align-items:center;justify-content:space-between;gap:2cqw;padding:1.6cqw 1.8cqw;background:var(--paper-2);border-left:3px solid var(--red)}
+  .closing .q{font-family:var(--serif);font-size:1.5cqw;line-height:1.6}
+
+  /* ── HUD ─────────────────────────────────────────────────────────── */
+  .hud{
+    position:fixed;left:50%;bottom:2vh;transform:translateX(-50%);z-index:20;
+    display:flex;align-items:center;gap:.9vw;padding:.65vw 1vw;border-radius:999px;
+    background:rgba(255,253,248,.82);border:1px solid var(--line);
+    box-shadow:0 12px 30px rgba(60,45,25,.14);backdrop-filter:blur(8px);
+    font-family:var(--mono);font-size:.76vw;color:var(--ink-2);transition:opacity .4s ease,transform .4s ease;
+  }
+  .hud.dim{opacity:.18}
+  .hud button{
+    all:unset;cursor:pointer;width:1.7vw;height:1.7vw;display:grid;place-items:center;
+    border:1px solid var(--line);border-radius:50%;color:var(--ink);transition:.2s ease;
+  }
+  .hud button:hover{background:var(--ink);color:var(--paper)}
+  .hud .cnt{min-width:4.4vw;text-align:center;letter-spacing:.08em}
+  .hud .cnt b{color:var(--ink);font-weight:600}
+  .hud .ttl{max-width:16vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-3)}
+  .hud .sep{width:1px;height:1.1vw;background:var(--line-2)}
+  .hud kbd{font-family:var(--mono);font-size:.66vw;padding:.12vw .34vw;border:1px solid var(--line);border-radius:3px;color:var(--ink-3)}
+  .progress{position:fixed;left:0;top:0;height:3px;background:var(--red);width:0;z-index:30;transition:width .45s var(--ease-out)}
+
+  .zone{position:fixed;top:0;bottom:8vh;width:12vw;z-index:15;cursor:pointer;background:transparent;border:0;padding:0}
+  .zone.left{left:0}
+  .zone.right{right:0}
+
+  @media (prefers-reduced-motion: reduce){
+    .a,.a-fade{opacity:1!important;animation:none!important;filter:none!important;transform:none!important}
+    .slide[data-anim="out"] .a,.slide[data-anim="out"] .a-fade{opacity:1!important}
+    .slide.is-active .draw{animation:none!important;stroke-dashoffset:0!important}
+    .slide.is-active .pop{animation:none!important}
+    .term .cur{animation:none}
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="viewport">
+  <div class="stage" id="stage">
+
+    <!-- 01 封面 -->
+    <section class="slide cover" data-title="封面">
+      <div class="cover-grid">
+        <div>
+          <div class="kicker a">DSH MEMORY TREE <span class="n">/ 01</span></div>
+          <h1 class="a">让 Agent <em>记住</em><br>跨会话的经验</h1>
+          <p class="lead a">一个把对话变成长期记忆的 DSH 插件<br>
+            AST 结构化 · 向量召回 · 分层 SQLite · 进程隔离</p>
+          <div class="badges a">
+            <span class="badge">v0.2.3</span>
+            <span class="badge">单文件 HTML</span>
+            <span class="badge">离线可跑</span>
+            <span class="badge">1024 维</span>
+          </div>
+          <div class="cover-meta a">原理 · 功能 · 工程保障 · 实测数据</div>
+        </div>
+        <div class="hero a-fade">
+          <div class="hcard c1"></div>
+          <div class="hcard c2"></div>
+          <div class="hcard c3"></div>
+          <svg class="hero-thread" viewBox="0 0 560 420" preserveAspectRatio="none" aria-hidden="true">
+            <path class="sv-red draw" style="--len:900" d="M40 330 C 150 300, 190 120, 300 150 C 400 178, 430 300, 520 250" stroke-width="1.6"/>
+            <circle cx="300" cy="150" r="4" fill="#D6452F"/>
+            <circle cx="300" cy="150" r="9" fill="none" stroke="#D6452F" stroke-width="1" opacity=".5"/>
+          </svg>
+          <div class="tape t1"></div>
+          <div class="tape t2"></div>
+          <div class="seal">记忆</div>
+        </div>
+      </div>
+      <div class="foot a"><span>dsh-memory-tree</span><span>把上下文变成可继承的资产</span><span class="pn">01 / 14</span></div>
+    </section>
+
+    <!-- 02 问题 -->
+    <section class="slide" data-title="问题：会话失忆">
+      <div class="kicker a">问题 <span class="n">/ 02</span></div>
+      <h2 class="a">每次对话，都<em>从零开始</em></h2>
+      <p class="lead a">上下文是内存，不是记忆：任务结束，上下文随之清空；下次再讲一遍。</p>
+
+      <div class="timeline">
+        <div class="tnode a"><span class="tpoint"></span>
+          <div class="tcard card">
+            <div class="when">TASK A · 进行中</div>
+            <div class="what">上下文塞满历史</div>
+            <div class="why">一切都在，但昂贵、有限、只在这一次。</div>
+          </div>
+        </div>
+        <div class="tnode a"><span class="tpoint"></span>
+          <div class="tcard card">
+            <div class="when">TASK A · 结束</div>
+            <div class="what">上下文被清空</div>
+            <div class="why">会话关闭，经验没有落到任何地方。</div>
+          </div>
+        </div>
+        <div class="tnode a"><span class="tpoint"></span>
+          <div class="tcard card bad">
+            <div class="when">TASK B · 新任务</div>
+            <div class="what">重新解释一遍</div>
+            <div class="why">偏好、约定、踩过的坑，全部重来。</div>
+          </div>
+        </div>
+        <div class="tnode a"><span class="tpoint"></span>
+          <div class="tcard card bad">
+            <div class="when">TASK C · 又一个新任务</div>
+            <div class="what">再解释一遍</div>
+            <div class="why">重复劳动，且每次都可能讲得不一致。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quote-band a">
+        上下文窗口解决“这一次”，记忆库解决“下一次”。
+        <small>CONTEXT IS MEMORY · MEMORY IS AN ASSET</small>
+      </div>
+      <div class="strip a">
+        <div class="it"><div class="k">COST</div><div class="t"><b>重复解释</b>：偏好与约束每次重讲，token 和耐心都在消耗</div></div>
+        <div class="it"><div class="k">DRIFT</div><div class="t"><b>答复漂移</b>：没有共同底稿，同一个问题可能给出不同答案</div></div>
+        <div class="it"><div class="k">LOSS</div><div class="t"><b>经验流失</b>：踩过的坑只存在于这一次的上下文里</div></div>
+      </div>
+      <div class="foot a"><span>02 · 为什么需要记忆</span><span class="pn">02 / 14</span></div>
+    </section>
+
+    <!-- 03 资产 -->
+    <section class="slide" data-title="目标：从消耗品到资产">
+      <div class="kicker a">目标 <span class="n">/ 03</span></div>
+      <h2 class="a">把上下文变成<em>可继承的资产</em></h2>
+      <p class="lead a">从“每次重新解释”到“第一次就对上”：记忆沉淀在磁盘上，随取随用。</p>
+
+      <div class="vs">
+        <div class="vs-col card a">
+          <h3>上下文 Context</h3>
+          <div class="sub">VOLATILE · EXPENSIVE</div>
+          <div class="hr"></div>
+          <div class="vs-row"><span class="k">存活</span><span class="v">本次会话</span></div>
+          <div class="vs-row"><span class="k">成本</span><span class="v">按 token 计费</span></div>
+          <div class="vs-row"><span class="k">容量</span><span class="v">窗口有限</span></div>
+          <div class="vs-row"><span class="k">检索</span><span class="v">全量塞入</span></div>
+          <div class="vs-row"><span class="k">跨会话</span><span class="v">✕</span></div>
+        </div>
+        <div class="vs-mid">
+          <span class="arrow">→</span>
+          <span class="lbl">捕获 + 结构化</span>
+        </div>
+        <div class="vs-col card a">
+          <h3>记忆库 Memory</h3>
+          <div class="sub">DURABLE · CHEAP · RETRIEVABLE</div>
+          <div class="hr"></div>
+          <div class="vs-row"><span class="k">存活</span><span class="v" style="color:var(--green)">长期</span></div>
+          <div class="vs-row"><span class="k">成本</span><span class="v">磁盘 + 一次向量化</span></div>
+          <div class="vs-row"><span class="k">容量</span><span class="v">按需增长（分层）</span></div>
+          <div class="vs-row"><span class="k">检索</span><span class="v">混合打分 + 预算</span></div>
+          <div class="vs-row"><span class="k">跨会话</span><span class="v" style="color:var(--green)">✓ 可继承</span></div>
+        </div>
+      </div>
+
+      <div class="foot a"><span>03 · 目标</span><span class="pn">03 / 14</span></div>
+    </section>
+
+    <!-- 04 架构 -->
+    <section class="slide" data-title="架构总览">
+      <div class="kicker a">架构 <span class="n">/ 04</span></div>
+      <h2 class="a">一张图看全流程：<em>宿主只做薄适配</em></h2>
+      <div class="diagram a">
+        <svg viewBox="0 0 1000 330" aria-label="DSH 宿主与记忆引擎子进程架构">
+          <rect class="sv-box-dash" x="24" y="26" width="352" height="250" rx="8"/>
+          <text class="sv-dim" x="44" y="52">DSH HOST · Electron</text>
+          <rect class="sv-box" x="48" y="68" width="140" height="52" rx="5"/>
+          <text class="sv-text" x="60" y="90">session/event</text>
+          <text class="sv-dim" x="60" y="106">捕获入口</text>
+          <rect class="sv-box" x="204" y="68" width="140" height="52" rx="5"/>
+          <text class="sv-text" x="216" y="90">agent/pre-step</text>
+          <text class="sv-dim" x="216" y="106">召回注入</text>
+          <rect class="sv-box" x="48" y="136" width="140" height="52" rx="5"/>
+          <text class="sv-text" x="60" y="158">tools</text>
+          <text class="sv-dim" x="60" y="174">mem_* 工具</text>
+          <rect class="sv-box" x="204" y="136" width="140" height="52" rx="5"/>
+          <text class="sv-text" x="216" y="158">systemPrompt</text>
+          <text class="sv-dim" x="216" y="174">使用说明</text>
+          <rect class="sv-box" x="48" y="204" width="296" height="50" rx="5"/>
+          <text class="sv-text" x="60" y="226">host-client.mjs · IPC 客户端</text>
+          <text class="sv-dim" x="60" y="242">超时 / 重启 / 日志</text>
+
+          <rect class="sv-box" x="560" y="26" width="416" height="250" rx="8" style="fill:rgba(47,107,90,.045);stroke:rgba(47,107,90,.35)"/>
+          <text class="sv-dim" x="580" y="52">MEMORY ENGINE · 子进程 · DSH 自带 Node 24</text>
+          <rect class="sv-box" x="584" y="68" width="112" height="74" rx="5"/>
+          <text class="sv-text" x="596" y="90">store</text>
+          <text class="sv-dim" x="596" y="106">AST / SQLite</text>
+          <text class="sv-dim" x="596" y="120">事务 / FTS</text>
+          <rect class="sv-box" x="712" y="68" width="112" height="74" rx="5"/>
+          <text class="sv-text" x="724" y="90">embed</text>
+          <text class="sv-dim" x="724" y="106">1024 维</text>
+          <text class="sv-dim" x="724" y="120">批量 / 重试</text>
+          <rect class="sv-box" x="840" y="68" width="112" height="74" rx="5"/>
+          <text class="sv-text" x="852" y="90">recall</text>
+          <text class="sv-dim" x="852" y="106">混合打分</text>
+          <text class="sv-dim" x="852" y="120">MMR / 预算</text>
+          <rect class="sv-box" x="584" y="166" width="368" height="52" rx="5"/>
+          <text class="sv-text" x="596" y="188">engine-host.mjs · 串行消息队列</text>
+          <text class="sv-dim" x="596" y="204">崩溃自愈 · 关闭预算 · 轮转</text>
+
+          <path class="sv-red" d="M344 218 H560" stroke-dasharray="5 5"/>
+          <path class="sv-red" d="M560 202 H344" stroke-dasharray="5 5"/>
+          <text class="sv-acc" x="398" y="196">IPC request</text>
+          <text class="sv-acc" x="398" y="236">result</text>
+
+          <rect class="sv-box" x="24" y="296" width="480" height="26" rx="4"/>
+          <text class="sv-text" x="38" y="314">SQLite：memory.db / warm / cold · Markdown 镜像</text>
+          <rect class="sv-box" x="560" y="296" width="416" height="26" rx="4"/>
+          <text class="sv-text" x="574" y="314">fail → 工具报错，对话继续</text>
+        </svg>
+      </div>
+      <div class="foot a"><span>04 · 进程隔离的架构</span><span class="pn">04 / 14</span></div>
+    </section>
+
+    <!-- 05 捕获 -->
+    <section class="slide" data-title="捕获：只记值得记的">
+      <div class="kicker a">捕获 <span class="n">/ 05</span></div>
+      <h2 class="a">捕获：<em>只记值得记的</em></h2>
+      <p class="lead a">监听会话事件，过滤掉系统注入与工具结果，按轮次合并成一份文档。</p>
+
+      <div class="flow">
+        <div class="fstep card a"><div class="n">01</div><div class="t">会话事件</div><div class="d">session/event<br>user · assistant</div></div>
+        <div class="farrow a">→</div>
+        <div class="fstep card a"><div class="n">02</div><div class="t">过滤</div><div class="d">source.kind<br>∈ {user, model}</div></div>
+        <div class="farrow a">→</div>
+        <div class="fstep card a"><div class="n">03</div><div class="t">缓冲</div><div class="d">按会话累积<br>1.5s 空闲</div></div>
+        <div class="farrow a">→</div>
+        <div class="fstep card a"><div class="n">04</div><div class="t">合并</div><div class="d">turn/end 落盘<br>1 轮 = 1 份</div></div>
+        <div class="farrow a">→</div>
+        <div class="fstep card a" style="border-color:rgba(47,107,90,.45)">
+          <div class="n" style="color:var(--green)">05</div><div class="t">文档</div><div class="d">## 用户<br>## 助手</div>
+        </div>
+      </div>
+
+      <div class="excl">
+        <div class="card a">
+          <h4>不会进入记忆的内容</h4>
+          <ul>
+            <li><code>time-context</code> / <code>runtime-context</code> 等系统注入</li>
+            <li>工具调用与工具结果</li>
+            <li>我们自己注入的 <code>&lt;memory-recall&gt;</code> 块</li>
+            <li>少于 8 个字符的噪音消息</li>
+          </ul>
+        </div>
+        <div class="card a">
+          <h4>为什么这样过滤</h4>
+          <ul>
+            <li>记忆只保留“人说过的话”和“模型答过的话”</li>
+            <li>避免把时间戳、工作目录当成用户偏好</li>
+            <li>避免“回忆”本身被再次记住，形成回音</li>
+          </ul>
+        </div>
+      </div>
+      <div class="strip a">
+        <div class="it"><div class="k">SAMPLE</div><div class="t"><b>一轮 = 一份</b>：## 用户 … ## 助手 … 在 turn/end 合并落盘</div></div>
+        <div class="it"><div class="k">DEDUPE</div><div class="t"><b>文本哈希</b>：同一内容重复出现时不重复入库</div></div>
+        <div class="it"><div class="k">RETRY</div><div class="t"><b>先落库后向量</b>：失败标记 pending，2 分钟后重试</div></div>
+      </div>
+      <div class="foot a"><span>05 · 捕获与过滤</span><span class="pn">05 / 14</span></div>
+    </section>
+
+    <!-- 06 AST -->
+    <section class="slide" data-title="结构化：让记忆可寻址">
+      <div class="kicker a">结构化 <span class="n">/ 06</span></div>
+      <h2 class="a">结构化：让记忆<em>可寻址</em></h2>
+      <p class="lead a">Markdown 被解析成一棵 AST 树：每个节点有唯一路径，命中后可以顺着路径回溯上下文。</p>
+
+      <div class="tree-wrap">
+        <div class="a" style="display:flex;align-items:center">
+          <svg viewBox="0 0 620 330" aria-label="记忆 AST 树">
+            <g class="pop" style="--d:100ms">
+              <rect class="sv-box" x="250" y="10" width="120" height="38" rx="4"/>
+              <text class="sv-title" x="266" y="34" style="font-size:13px">会话文档</text>
+            </g>
+            <path class="sv-line" d="M310 48 V70 M310 70 H120 M310 70 H310 M310 70 H500 M120 70 V92 M310 70 V92 M500 70 V92"/>
+            <g class="pop" style="--d:220ms">
+              <rect class="sv-box" x="40" y="92" width="160" height="34" rx="4"/>
+              <text class="sv-text" x="52" y="114" style="fill:var(--red)"># 光遗传学与生物显示</text>
+            </g>
+            <g class="pop" style="--d:300ms">
+              <rect class="sv-box" x="240" y="92" width="140" height="34" rx="4"/>
+              <text class="sv-text" x="252" y="114">## 装置方案</text>
+            </g>
+            <g class="pop" style="--d:380ms">
+              <rect class="sv-box" x="440" y="92" width="140" height="34" rx="4"/>
+              <text class="sv-text" x="452" y="114">## 材料清单</text>
+            </g>
+
+            <path class="sv-red" d="M120 126 V148 M120 148 H300 M300 148 V170" stroke-dasharray="4 4"/>
+            <g class="pop" style="--d:480ms">
+              <rect class="sv-box" x="220" y="170" width="170" height="34" rx="4" style="stroke:var(--red);stroke-width:1.4"/>
+              <text class="sv-text" x="232" y="192" style="fill:var(--red)">### 艺术应用 · 生物显示</text>
+            </g>
+            <path class="sv-line" d="M305 204 V226 M305 226 H180 M305 226 H430 M180 226 V248 M430 226 V248"/>
+            <g class="pop" style="--d:560ms">
+              <rect class="sv-box" x="100" y="248" width="160" height="30" rx="4"/>
+              <text class="sv-dim" x="112" y="267">· 像素化藻类阵列</text>
+            </g>
+            <g class="pop" style="--d:620ms">
+              <rect class="sv-box" x="350" y="248" width="160" height="30" rx="4"/>
+              <text class="sv-dim" x="362" y="267">· 光照序列驱动</text>
+            </g>
+            <text class="sv-dim" x="40" y="310">每个节点 = 一行可寻址记忆 · 段落超长按句界切分（≤900 字符）</text>
+          </svg>
+        </div>
+        <div class="tree-side">
+          <div class="path-pill a">/光遗传学与生物显示/艺术应用/生物显示/像素化藻类阵列</div>
+          <div class="rule a"><span class="b">标题</span><span>→ section（小节节点）</span></div>
+          <div class="rule a"><span class="b">编号</span><span>→ section，用于步骤/清单</span></div>
+          <div class="rule a"><span class="b">项目符</span><span>→ point（要点节点）</span></div>
+          <div class="rule a"><span class="b">段落</span><span>→ paragraph，默认记忆单元</span></div>
+          <div class="note a">命中任意节点，都能把它所在的整条路径作为上下文一起召回。</div>
+        </div>
+      </div>
+      <div class="foot a"><span>06 · AST 结构化</span><span class="pn">06 / 14</span></div>
+    </section>
+
+    <!-- 07 向量 -->
+    <section class="slide" data-title="语义：向量与软边">
+      <div class="kicker a">语义 <span class="n">/ 07</span></div>
+      <h2 class="a">语义：<em>向量 + 软边</em>，而不是只认关键词</h2>
+      <p class="lead a">每个节点算一个 1024 维向量；相近的节点之间连一条“软边”，召回时沿边扩散一跳。</p>
+
+      <div class="diagram a">
+        <svg viewBox="0 0 1000 320" aria-label="向量与相似边">
+          <g stroke="rgba(23,20,15,.18)" stroke-width="1">
+            <line x1="500" y1="160" x2="260" y2="90"/>
+            <line x1="500" y1="160" x2="300" y2="250"/>
+            <line x1="500" y1="160" x2="700" y2="80"/>
+            <line x1="500" y1="160" x2="740" y2="230"/>
+          </g>
+          <g stroke="var(--red)" stroke-width="1.4" stroke-dasharray="4 4" opacity=".8">
+            <line x1="500" y1="160" x2="260" y2="90"/>
+            <line x1="500" y1="160" x2="740" y2="230"/>
+          </g>
+
+          <circle cx="500" cy="160" r="34" fill="rgba(214,69,47,.08)" stroke="var(--red)" stroke-width="1.6"/>
+          <circle cx="500" cy="160" r="58" fill="none" stroke="var(--red)" stroke-width="1" stroke-dasharray="3 6" opacity=".45"/>
+          <text x="500" y="156" text-anchor="middle" class="sv-text" style="fill:var(--red)">query</text>
+          <text x="500" y="172" text-anchor="middle" class="sv-dim">召回起点</text>
+
+          <g>
+            <circle cx="260" cy="90" r="13" fill="var(--paper)" stroke="var(--green)" stroke-width="1.6"/>
+            <text x="260" y="66" text-anchor="middle" class="sv-dim">0.86</text>
+            <text x="260" y="114" text-anchor="middle" class="sv-text" style="font-size:9.5px">相似节点</text>
+          </g>
+          <g>
+            <circle cx="300" cy="250" r="13" fill="var(--paper)" stroke="var(--line)" stroke-width="1.4"/>
+            <text x="300" y="280" text-anchor="middle" class="sv-dim">0.41</text>
+          </g>
+          <g>
+            <circle cx="700" cy="80" r="13" fill="var(--paper)" stroke="var(--line)" stroke-width="1.4"/>
+            <text x="700" y="56" text-anchor="middle" class="sv-dim">0.58</text>
+          </g>
+          <g>
+            <circle cx="740" cy="230" r="13" fill="var(--paper)" stroke="var(--green)" stroke-width="1.6"/>
+            <text x="740" y="260" text-anchor="middle" class="sv-dim">0.81</text>
+          </g>
+
+          <path class="sv-red" d="M260 90 C 200 40, 120 40, 80 70" stroke-dasharray="3 5" opacity=".5"/>
+          <text x="80" y="92" class="sv-dim">一跳：父节点 / 相似边</text>
+          <text x="640" y="300" class="sv-dim">余弦 ≥ 0.72 才建边</text>
+        </svg>
+      </div>
+      <div class="foot a"><span>07 · 向量化与相似边</span><span class="pn">07 / 14</span></div>
+    </section>
+
+    <!-- 08 分层 -->
+    <section class="slide" data-title="存储：热、温、冷">
+      <div class="kicker a">存储 <span class="n">/ 08</span></div>
+      <h2 class="a">存储：<em>热、温、冷</em>三层，按年龄搬家</h2>
+      <p class="lead a">SQLite 单文件 WAL；整份文档按时间迁移，召回跨层加权，空间不够时可以压缩回收。</p>
+
+      <div class="tiers">
+        <div class="a" style="display:flex;align-items:center">
+          <svg viewBox="0 0 560 320" aria-label="三层存储">
+            <g class="pop" style="--d:80ms">
+              <path d="M100 40 L460 40 L500 88 L140 88 Z" fill="rgba(214,69,47,.10)" stroke="rgba(214,69,47,.6)" stroke-width="1.2"/>
+              <text x="130" y="70" class="sv-title" style="font-size:13px">hot · memory.db</text>
+              <text x="330" y="70" class="sv-dim">0–30 天 · 权重 1.0</text>
+            </g>
+            <g class="pop" style="--d:180ms">
+              <path d="M100 104 L460 104 L500 152 L140 152 Z" fill="rgba(201,138,46,.10)" stroke="rgba(201,138,46,.55)" stroke-width="1.2"/>
+              <text x="130" y="134" class="sv-title" style="font-size:13px">warm · memory-warm.db</text>
+              <text x="330" y="134" class="sv-dim">30–180 天 · 0.9</text>
+            </g>
+            <g class="pop" style="--d:280ms">
+              <path d="M100 168 L460 168 L500 216 L140 216 Z" fill="rgba(23,20,15,.06)" stroke="rgba(23,20,15,.28)" stroke-width="1.2"/>
+              <text x="130" y="198" class="sv-title" style="font-size:13px">cold · memory-cold.db</text>
+              <text x="330" y="198" class="sv-dim">&gt;180 天 · 0.78</text>
+            </g>
+            <path class="sv-red" d="M500 236 V300" stroke-dasharray="4 4"/>
+            <text x="150" y="262" class="sv-dim">整份文档搬家 · 每 6 小时自动轮转 · mem_rotate 手动触发</text>
+            <text x="150" y="288" class="sv-dim">compact：checkpoint → DELETE → VACUUM（27.8 MB → 1.38 MB）</text>
+          </svg>
+        </div>
+        <div class="tier-list">
+          <div class="tier-row a"><span class="sw" style="background:rgba(214,69,47,.7)"></span><span class="nm">hot</span><span class="ds">最近 30 天，召回主力</span></div>
+          <div class="tier-row a"><span class="sw" style="background:rgba(201,138,46,.7)"></span><span class="nm">warm</span><span class="ds">30–180 天，权重 0.9</span></div>
+          <div class="tier-row a"><span class="sw" style="background:rgba(23,20,15,.35)"></span><span class="nm">cold</span><span class="ds">180 天以上，权重 0.78</span></div>
+          <div class="note a">冷层可以只留文本、丢掉向量：以“精确记忆”换空间；分层文件仍可单独备份。</div>
+        </div>
+      </div>
+      <div class="foot a"><span>08 · 分层存储</span><span class="pn">08 / 14</span></div>
+    </section>
+
+    <!-- 09 打分 -->
+    <section class="slide" data-title="检索：混合打分">
+      <div class="kicker a">检索 <span class="n">/ 09</span></div>
+      <h2 class="a">检索：<em>混合打分</em>，而不是只看向量</h2>
+
+      <div class="score">
+        <div>
+          <div class="formula a">
+            base <span class="op">=</span> ( <span class="accent">0.55</span>·cos
+            <span class="op">+</span> <span class="green">0.20</span>·lexical
+            <span class="op">+</span> <span class="accent">0.25</span>·RRF )
+            <span class="op">×</span> tier
+          </div>
+          <div class="bar a"><span class="lb">向量相似</span><span class="track"><span class="fill r" style="--w:55%"></span></span><span class="vv">0.55</span></div>
+          <div class="bar a"><span class="lb">词法命中</span><span class="track"><span class="fill g" style="--w:20%"></span></span><span class="vv">0.20</span></div>
+          <div class="bar a"><span class="lb">双路一致 RRF</span><span class="track"><span class="fill" style="--w:25%"></span></span><span class="vv">0.25</span></div>
+          <div class="bar a"><span class="lb">一跳扩散</span><span class="track"><span class="fill" style="--w:55%"></span></span><span class="vv">×0.55</span></div>
+          <div class="bar a"><span class="lb">先验加分</span><span class="track"><span class="fill g" style="--w:14%"></span></span><span class="vv">+0.14</span></div>
+          <div class="note a" style="margin-top:1.2cqw">最后做多样性收敛（MMR 0.88）与预算裁剪：默认 6 条 / 2400 字符。</div>
+          <div class="card a" style="margin-top:1.5cqw;padding:1.05cqw 1.2cqw">
+            <div class="k" style="font-family:var(--mono);font-size:.74cqw;letter-spacing:.14em;color:var(--ink-3)">TOP-3 · 本次召回</div>
+            <div class="rk"><span>0.81</span>生物显示 / 像素化藻类阵列</div>
+            <div class="rk"><span>0.66</span>装置方案 / 8×8 原型</div>
+            <div class="rk"><span>0.52</span>材料清单 / 培养基与宿主</div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step a"><span class="i">01</span><span class="tx"><b>两路召回</b>：向量 topK + FTS 关键词 topK（中文 bigram）</span></div>
+          <div class="step a"><span class="i">02</span><span class="tx"><b>融合排序</b>：相似度为主，词法与 RRF 兜住专有名词</span></div>
+          <div class="step a"><span class="i">03</span><span class="tx"><b>沿边扩散</b>：父节点与相似邻居各按 0.55 折入</span></div>
+          <div class="step a"><span class="i">04</span><span class="tx"><b>预算裁剪</b>：先广后精，宁缺毋滥，避免把上下文塞满</span></div>
+        </div>
+      </div>
+      <div class="strip a">
+        <div class="it"><div class="k">WHY</div><div class="t"><b>为什么要混合</b>：只看向量时，型号/专有名词容易漏召回</div></div>
+        <div class="it"><div class="k">BUDGET</div><div class="t"><b>预算</b>：默认 6 条 / 2400 字符，超出即裁剪</div></div>
+        <div class="it"><div class="k">DIVERSITY</div><div class="t"><b>收敛</b>：MMR 0.88，避免同一段话的多个副本</div></div>
+      </div>
+      <div class="foot a"><span>09 · 混合检索与预算</span><span class="pn">09 / 14</span></div>
+    </section>
+
+    <!-- 10 注入 -->
+    <section class="slide" data-title="注入：把记忆放回上下文">
+      <div class="kicker a">注入 <span class="n">/ 10</span></div>
+      <h2 class="a">注入：把记忆<em>放回上下文</em></h2>
+      <p class="lead a">每轮第一步，按当前问题召回一次，作为一条独立消息插入；记忆是参考，不是指令。</p>
+
+      <div class="inject">
+        <div class="conv">
+          <div class="msg user a"><span class="lbl">USER</span>继续做上次那个绿藻显示装置，材料清单帮我列一下</div>
+          <div class="msg recall a"><span class="lbl">PLUGIN · &lt;memory-recall&gt;</span><span style="color:var(--red)">/光遗传学与生物显示/装置方案</span><br>需求：像素化藻类阵列 · 光照序列驱动<br>约定：先做 8×8 原型，电源用 5V USB</div>
+          <div class="msg ai a"><span class="lbl">ASSISTANT</span>沿用上次的 8×8 方案，清单按“藻类培养基 / 光源阵列 / 控制板 / 遮光结构”四组给出……</div>
+        </div>
+        <div class="safe-list">
+          <div class="safe a"><span class="k">只插一条</span><span>不修改用户原话，不重复注入，同一轮只做一次</span></div>
+          <div class="safe a"><span class="k">冷却 60s</span><span>避免连续追问时反复召回、拖慢首字延迟</span></div>
+          <div class="safe a"><span class="k">帧标记转义</span><span>记忆内容里的标签会被转义，不能被当成本轮指令</span></div>
+          <div class="safe a"><span class="k">注明不可信</span><span>召回块明确标注“历史参考资料”，以当前请求为准</span></div>
+        </div>
+      </div>
+      <div class="foot a"><span>10 · 召回注入与安全边界</span><span class="pn">10 / 14</span></div>
+    </section>
+
+    <!-- 11 工程 -->
+    <section class="slide" data-title="工程保障：记忆不能拖垮对话">
+      <div class="kicker a">工程 <span class="n">/ 11</span></div>
+      <h2 class="a">工程保障：记忆<em>不能拖垮对话</em></h2>
+
+      <div class="eng">
+        <div class="a" style="display:flex;align-items:center">
+          <svg viewBox="0 0 620 320" aria-label="崩溃自愈时序">
+            <text x="90" y="26" class="sv-dim">HOST</text>
+            <text x="430" y="26" class="sv-dim">ENGINE CHILD</text>
+            <path d="M100 40 V300" stroke="rgba(23,20,15,.3)" stroke-dasharray="4 5"/>
+            <path d="M440 40 V300" stroke="rgba(23,20,15,.3)" stroke-dasharray="4 5"/>
+
+            <path class="sv-line" d="M100 66 H440" marker-end="url(#arw)"/>
+            <text x="112" y="60" class="sv-dim">spawn（自带 Node 24）</text>
+            <path class="sv-line" d="M440 96 H100" marker-end="url(#arw)"/>
+            <text x="300" y="90" class="sv-dim">ready</text>
+            <path class="sv-line" d="M100 126 H440" marker-end="url(#arw)"/>
+            <text x="112" y="120" class="sv-dim">remember / recall</text>
+
+            <rect x="392" y="146" width="96" height="34" fill="rgba(214,69,47,.10)" stroke="rgba(214,69,47,.55)" stroke-width="1" rx="3"/>
+            <text x="440" y="168" text-anchor="middle" class="sv-acc" style="font-size:9px">SIGKILL 崩溃</text>
+
+            <path class="sv-red" d="M440 200 H100" stroke-dasharray="4 4"/>
+            <text x="150" y="194" class="sv-dim" style="fill:var(--red)">宿主存活 · 请求失败降级</text>
+            <path class="sv-line" d="M100 232 H440" marker-end="url(#arw)"/>
+            <text x="112" y="226" class="sv-dim">restart（1s → 2s → 4s，10 分钟最多 3 次）</text>
+            <path class="sv-line" d="M440 262 H100" marker-end="url(#arw)"/>
+            <text x="280" y="256" class="sv-dim">恢复读写</text>
+            <text x="100" y="292" class="sv-dim">所有步骤写入 plugin.log（512 KB 轮转）</text>
+
+            <defs>
+              <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 Z" fill="rgba(23,20,15,.5)"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+        <div class="eng-side">
+          <div class="eng-item a"><span class="i">01</span><span><b>进程隔离</b>：SQLite / 向量 / AST 全部在子进程，宿主只留薄适配</span></div>
+          <div class="eng-item a"><span class="i">02</span><span><b>崩溃自愈</b>：子进程死了，对话继续；请求干净失败，后台指数退避重启</span></div>
+          <div class="eng-item a"><span class="i">03</span><span><b>关闭预算</b>：1 秒硬上限，SIGKILL 引擎，不扣住宿主退出</span></div>
+          <div class="eng-item a"><span class="i">04</span><span><b>现场可查</b>：plugin.log 记录挂载、重启、stderr 与引擎告警</span></div>
+          <div class="note a" style="border-left:2px solid var(--red);padding-left:1cqw;margin-top:.6cqw">最坏情况是“暂时记不住”，不是“没法聊”。</div>
+        </div>
+      </div>
+      <div class="strip a">
+        <div class="it"><div class="k">ISOLATION</div><div class="t"><b>崩溃隔离</b>：SIGKILL 子进程，宿主存活并自动恢复（8/8）</div></div>
+        <div class="it"><div class="k">SHUTDOWN</div><div class="t"><b>关闭实测</b>：17ms；硬上限 1s，不扣住宿主退出</div></div>
+        <div class="it"><div class="k">LOG</div><div class="t"><b>现场可查</b>：plugin.log 512KB 轮转，含子进程 stderr</div></div>
+      </div>
+      <div class="foot a"><span>11 · 工程保障</span><span class="pn">11 / 14</span></div>
+    </section>
+
+    <!-- 12 数据 -->
+    <section class="slide" data-title="实测：规模与延迟">
+      <div class="kicker a">实测 <span class="n">/ 12</span></div>
+      <h2 class="a">实测：<em>规模上去，延迟仍然可控</em></h2>
+      <p class="lead a">本机 1024 维、单进程 faiss-free 全量扫描；数据可用 <span class="mono">bench.mjs</span> 复现。</p>
+
+      <div class="bench">
+        <div class="a">
+        <table class="bt">
+          <thead><tr><th>节点规模</th><th>召回 p50</th><th>热层体积</th><th>备注</th></tr></thead>
+          <tbody>
+            <tr><td class="nm">1,000</td><td data-count="11.6">11.6</td><td>5.4 MB</td><td>日常会话量级</td></tr>
+            <tr><td class="nm">10,000</td><td data-count="55.9">55.9</td><td>54 MB</td><td>一年以上的项目</td></tr>
+            <tr class="hl"><td class="nm">30,000</td><td data-count="191">191</td><td>162 MB</td><td>建议接 sqlite-vec</td></tr>
+            <tr><td class="nm">compact 后</td><td>—</td><td>1.38 MB</td><td>27.8 MB → 1.38 MB</td></tr>
+          </tbody>
+        </table>
+        <div class="card a" style="margin-top:1.6cqw;padding:1.05cqw 1.2cqw;align-self:start">
+          <div class="k" style="font-family:var(--mono);font-size:.74cqw;letter-spacing:.14em;color:var(--ink-3)">WHEN TO SCALE</div>
+          <div style="margin-top:.45cqw;font-size:.9cqw;line-height:1.65;color:var(--ink-2)">
+            低于 3 万节点：全量扫描足够，零依赖、可离线；<br>
+            超过 5 万或需要过滤检索：接 <span class="mono">sqlite-vec</span>，接口不变、只换索引层。
+          </div>
+        </div>
+                </div>
+<div class="chart a">
+          <svg viewBox="0 0 520 300" aria-label="延迟随规模增长">
+            <line class="axis" x1="52" y1="250" x2="500" y2="250"/>
+            <line class="axis" x1="52" y1="30" x2="52" y2="250"/>
+            <g class="grid">
+              <line x1="52" y1="190" x2="500" y2="190"/>
+              <line x1="52" y1="130" x2="500" y2="130"/>
+              <line x1="52" y1="70" x2="500" y2="70"/>
+            </g>
+            <text x="10" y="250" class="lbl">0</text>
+            <text x="10" y="190" class="lbl">60ms</text>
+            <text x="10" y="130" class="lbl">120ms</text>
+            <text x="10" y="70" class="lbl">190ms</text>
+            <text x="60" y="276" class="lbl">1k</text>
+            <text x="228" y="276" class="lbl">10k</text>
+            <text x="428" y="276" class="lbl">30k</text>
+
+            <path class="line" style="--len:600" d="M120 238 C 200 232, 240 218, 300 194 S 420 110, 470 66"/>
+            <circle class="pt" cx="120" cy="238" r="5"/>
+            <circle class="pt" cx="300" cy="194" r="5"/>
+            <circle class="pt" cx="470" cy="66" r="5"/>
+            <text x="128" y="226" class="lbl">11.6</text>
+            <text x="308" y="182" class="lbl">55.9</text>
+            <text x="452" y="54" class="lbl">191</text>
+            <text x="52" y="300" class="sv-dim">节点数（线性轴） · p50 毫秒</text>
+          </svg>
+        </div>
+      </div>
+      <div class="strip a">
+        <div class="it"><div class="k">ENV</div><div class="t"><b>环境</b>：Windows · Node 24 · 1024 维 · 单进程全量扫描</div></div>
+        <div class="it"><div class="k">REPRO</div><div class="t"><b>复现</b>：node scripts/bench.mjs</div></div>
+        <div class="it"><div class="k">TAKEAWAY</div><div class="t"><b>结论</b>：3 万节点仍在 200ms 内，可作日常记忆库</div></div>
+      </div>
+      <div class="foot a"><span>12 · 实测数据（bench.mjs）</span><span class="pn">12 / 14</span></div>
+    </section>
+
+    <!-- 13 使用 -->
+    <section class="slide" data-title="使用：一条命令，几个工具">
+      <div class="kicker a">使用 <span class="n">/ 13</span></div>
+      <h2 class="a">使用：<em>一条命令</em>装好，几个工具够用</h2>
+
+      <div class="term a">
+        <span class="ln"><span class="pf">$</span> node scripts/install.mjs --profile ~/.dsh/profiles/desktop</span>
+        <span class="ln out">  ✓ cordis.patch.yml 已写入（幂等，重复执行安全）</span>
+        <span class="ln out">  ✓ 插件入口：dsh-memory-tree.plugin.mjs</span>
+        <span class="ln"><span class="pf">$</span> node scripts/demo.mjs</span>
+        <span class="ln out">  docs=570 nodes=65160 · 3 tiers · p50 12ms/1k</span>
+        <span class="ln"><span class="pf">$</span> <span class="cm">mem_stats</span>   <span class="out"># 文档 / 节点 / 分层 / 占用</span></span>
+        <span class="ln"><span class="pf">$</span> <span class="cm">mem_recall</span>  <span class="out"># 语义 + 词法混合检索</span></span>
+        <span class="ln"><span class="pf">$</span> <span class="cm">mem_store</span>   <span class="out"># 显式记一条长期记忆</span><span class="cur"></span></span>
+      </div>
+
+      <div class="use-grid">
+        <div class="card a" style="padding:1.1cqw 1.3cqw">
+          <div class="tool"><span class="nm">mem_recall</span><span class="ds">按问题召回，返回带路径的片段</span></div>
+          <div class="tool"><span class="nm">mem_store</span><span class="ds">把结论/偏好写成长期记忆</span></div>
+          <div class="tool"><span class="nm">mem_stats</span><span class="ds">规模、分层、占用、待嵌入</span></div>
+          <div class="tool"><span class="nm">mem_dream</span><span class="ds">去重、重建软边、合并主题</span></div>
+          <div class="tool"><span class="nm">mem_rotate</span><span class="ds">手动触发热/温/冷轮转</span></div>
+        </div>
+        <div class="a" style="display:flex;flex-direction:column;justify-content:center;gap:.7cqw">
+          <div class="rule"><span class="b">数据</span><span>一个目录：<span class="mono">~/.dsh/memory-tree/</span></span></div>
+          <div class="rule"><span class="b">配置</span><span><span class="mono">config.json</span> 机器级共享，插件参数只覆盖显式字段</span></div>
+          <div class="rule"><span class="b">卸载</span><span>删插件条目即可；记忆数据保留，可随时重装</span></div>
+          <div class="note" style="margin-top:.6cqw">安装器幂等；profile 会备份，误操作可回滚。</div>
+        </div>
+      </div>
+      <div class="foot a"><span>13 · 安装与使用</span><span class="pn">13 / 14</span></div>
+    </section>
+
+    <!-- 14 路线 -->
+    <section class="slide" data-title="路线图与结尾">
+      <div class="kicker a">路线 <span class="n">/ 14</span></div>
+      <h2 class="a">路线：从<em>记住</em>，到<em>理解</em></h2>
+
+      <div class="phase">
+        <div class="ph card done a">
+          <span class="st">已完成</span>
+          <div class="lv">L1 · MEMORY TREE</div>
+          <h3>记忆树</h3>
+          <p>AST 结构化、向量召回、分层落盘、进程隔离、工具与注入。当前的版本。</p>
+        </div>
+        <div class="ph card a">
+          <span class="st">下一步</span>
+          <div class="lv">L2 · CONSOLIDATION</div>
+          <h3>巩固与理解</h3>
+          <p>周期性摘要、主题合并、冲突检测、重要度衰减；从“记住片段”到“形成观点”。</p>
+        </div>
+        <div class="ph card a">
+          <span class="st">远期</span>
+          <div class="lv">L3 · PERSONALIZATION</div>
+          <h3>个性化</h3>
+          <p>基于长期记忆微调 LoRA，把偏好与风格写进模型；多机同步与团队共享。</p>
+        </div>
+      </div>
+
+      <div class="closing a">
+        <div class="q">记忆不是存下来，<br>而是<em>下次用得上</em>。</div>
+        <div style="display:flex;align-items:center;gap:1.4cqw">
+          <div class="note" style="text-align:right">dsh-memory-tree · v0.2.3<br>开源前需作者审核</div>
+          <div class="seal" style="position:static;width:5.2cqw;height:5.2cqw;font-size:1.2cqw">记忆</div>
+        </div>
+      </div>
+      <div class="strip a">
+        <div class="it"><div class="k">NOW</div><div class="t"><b>现状</b>：数百文档 · 数万节点 · 5 个工具 · 一条命令部署</div></div>
+        <div class="it"><div class="k">NEXT</div><div class="t"><b>下一步</b>：打开 autoInject，在真实会话里验证注入</div></div>
+        <div class="it"><div class="k">DOCS</div><div class="t"><b>文档</b>：README / ARCHITECTURE / PRINCIPLES / DEPLOY</div></div>
+      </div>
+      <div class="foot a"><span>14 · 路线图</span><span class="pn">14 / 14</span></div>
+    </section>
+
+  </div>
+</div>
+
+<button class="zone left" id="prevZone" aria-label="上一页"></button>
+<button class="zone right" id="nextZone" aria-label="下一页"></button>
+
+<aside class="hud" id="hud">
+  <button id="prev" aria-label="上一页">‹</button>
+  <span class="cnt"><b id="pageNow">01</b> / 14</span>
+  <button id="next" aria-label="下一页">›</button>
+  <span class="sep"></span>
+  <span class="ttl" id="ttl">封面</span>
+  <span class="sep"></span>
+  <span><kbd>←</kbd><kbd>→</kbd> 翻页 · <kbd>H</kbd> 隐藏</span>
+</aside>
+
+<script>
+(() => {
+  const slides = [...document.querySelectorAll('.slide')];
+  const stage = document.getElementById('stage');
+  const nowEl = document.getElementById('pageNow');
+  const ttlEl = document.getElementById('ttl');
+  const prog = document.getElementById('progress');
+  const hud = document.getElementById('hud');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  let index = 0;
+  let busy = false;
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  function itemsOf(slide) {
+    return [...slide.querySelectorAll('.a, .a-fade')];
+  }
+
+  function enter(slide) {
+    const items = itemsOf(slide);
+    items.forEach((el, i) => el.style.setProperty('--d', (i * 65) + 'ms'));
+    // stagger the SVG pops as well
+    slide.querySelectorAll('.pop').forEach((el, i) => {
+      if (!el.style.getPropertyValue('--d')) el.style.setProperty('--d', (150 + i * 70) + 'ms');
+    });
+    slide.dataset.anim = 'in';
+    slide.classList.add('is-active');
+    countUp(slide);
+  }
+
+  function exit(slide) {
+    const items = itemsOf(slide);
+    items.forEach((el, i) => el.style.setProperty('--do', ((items.length - 1 - i) * 38) + 'ms'));
+    slide.dataset.anim = 'out';
+  }
+
+  function settleOut(slide) {
+    slide.classList.remove('is-active');
+    slide.dataset.anim = '';
+    slide.querySelectorAll('.a, .a-fade').forEach((el) => {
+      el.style.removeProperty('--d');
+    });
+  }
+
+  function countUp(slide) {
+    const nodes = [...slide.querySelectorAll('[data-count]')];
+    if (!nodes.length) return;
+    const instant = reduce.matches;
+    for (const el of nodes) {
+      const target = Number(el.dataset.count);
+      if (instant || !Number.isFinite(target)) {
+        el.textContent = String(target);
+        continue;
+      }
+      const decimals = String(target).includes('.') ? 1 : 0;
+      const started = performance.now();
+      const duration = 900;
+      const tick = (now) => {
+        const t = Math.min(1, (now - started) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.textContent = (target * eased).toFixed(decimals);
+        if (t < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
+  function go(next, options = {}) {
+    const instant = options.instant || reduce.matches;
+    if (next < 0 || next >= slides.length) return;
+    if (next === index && !options.force) return;
+    if (busy && !instant) return;
+
+    const current = slides[index];
+    const target = slides[next];
+
+    if (instant) {
+      settleOut(current);
+      index = next;
+      enter(target);
+      updateChrome();
+      return;
+    }
+
+    busy = true;
+    exit(current);
+    const items = itemsOf(current).length;
+    const exitMs = 300 + Math.min(items, 14) * 38;
+    setTimeout(() => {
+      settleOut(current);
+      index = next;
+      enter(target);
+      updateChrome();
+      busy = false;
+    }, exitMs);
+  }
+
+  function updateChrome() {
+    nowEl.textContent = pad(index + 1);
+    ttlEl.textContent = slides[index].dataset.title || '';
+    prog.style.width = ((index + 1) / slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (index + 1));
+  }
+
+  const initial = Number((location.hash.match(/\d+/) || [0])[0]) - 1;
+  index = Math.max(0, Math.min(slides.length - 1, Number.isFinite(initial) ? initial : 0));
+  slides.forEach((slide, i) => {
+    slide.classList.toggle('is-active', i === index);
+    if (i === index) enter(slide);
+  });
+  updateChrome();
+
+  addEventListener('keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const key = event.key;
+    if (key === 'ArrowRight' || key === 'PageDown' || key === ' ') {
+      event.preventDefault();
+      go(index + 1);
+    } else if (key === 'ArrowLeft' || key === 'PageUp') {
+      event.preventDefault();
+      go(index - 1);
+    } else if (key === 'Home') {
+      go(0);
+    } else if (key === 'End') {
+      go(slides.length - 1);
+    } else if (key === 'f' || key === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.();
+    } else if (key === 'h' || key === 'H') {
+      hud.classList.toggle('dim');
+    }
+  });
+
+  document.getElementById('prev').addEventListener('click', () => go(index - 1));
+  document.getElementById('next').addEventListener('click', () => go(index + 1));
+  document.getElementById('prevZone').addEventListener('click', () => go(index - 1));
+  document.getElementById('nextZone').addEventListener('click', () => go(index + 1));
+
+  let idleTimer = 0;
+  addEventListener('mousemove', () => {
+    hud.classList.remove('dim');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => hud.classList.add('dim'), 2600);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="DSH Memory Tree">
+  <rect width="128" height="128" rx="22" fill="#F6F1E7"/>
+  <g fill="none" stroke="#17140F" stroke-width="3" stroke-linecap="round">
+    <path d="M64 100 V58"/>
+    <path d="M64 74 L42 58 M64 74 L86 58"/>
+    <path d="M42 58 V40 M86 58 V40"/>
+  </g>
+  <g fill="#D6452F">
+    <circle cx="42" cy="38" r="7"/>
+    <circle cx="86" cy="38" r="7"/>
+  </g>
+  <circle cx="64" cy="74" r="6" fill="#2F6B5A"/>
+  <rect x="52" y="100" width="24" height="6" rx="3" fill="#C98A2E"/>
+</svg>
