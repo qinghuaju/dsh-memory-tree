@@ -15,8 +15,9 @@
 ```bash
 node scripts/selftest.mjs          # 离线全绿（40 checks）
 node scripts/selftest.mjs --live   # 真实 embedding 全绿（42 checks，需要 key）
-node scripts/dryrun-plugin.mjs     # 插件挂载全绿（23 checks）
+node scripts/dryrun-plugin.mjs     # 插件挂载全绿（26 checks）
 node scripts/check-secrets.mjs     # 必须 clean
+node scripts/check-market.mjs      # 索引存在时校验 format 1
 node scripts/bench.mjs --sizes 1000,10000,30000   # README 数字必须来自这次运行
 node --check src/plugin.mjs        # 语法
 git status --short                 # 确认没有意外文件
@@ -27,7 +28,7 @@ git status --short                 # 确认没有意外文件
 - [ ] `git ls-files` 里没有 `node_modules/`、`data/`、`*.db`、`credentials.json`、`.env`、`pollinationsApi.md`；
 - [ ] `git log -p` 里没有历史密钥（如果曾提交过，必须换 key，而不是只删文件）；
 - [ ] README 的安装步骤在一台“干净”机器上可执行（至少 read-through 一遍）；
-- [ ] 版本号已更新（`package.json` = 0.2.0），CHANGELOG 有对应段落；
+- [ ] 版本号已更新（`package.json` = 0.3.0），CHANGELOG 有对应段落；
 - [ ] CI 在目标仓库上跑过一次并且是绿的（`.github/workflows/ci.yml`）。
 
 ## 1.5 发布素材（决定首屏转化）
