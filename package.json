@@ -69,8 +69,5 @@
     "bundle": {
       "patch": "cordis.patch.yml"
     }
-  },
-  "dependencies": {
-    "isomorphic-git": "^1.25.10"
   }
 }

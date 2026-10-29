@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a capability, provider, or integration
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that the plugin makes hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work? Configuration sketch or tool name is enough.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - retrieval quality
+        - storage / tiering
+        - embedding provider
+        - capture / injection
+        - tools
+        - deployment
+        - documentation
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

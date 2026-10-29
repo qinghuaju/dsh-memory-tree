@@ -29,3 +29,7 @@ Thumbs.db
 
 # vendor reference material (kept locally, not part of the package)
 pollinationsApi.md
+
+acl-recovery/
+.tmp-*
+package-lock.json
