@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "title": {
+    "en": "DSH Memory Tree",
+    "zh": "DSH 记忆树"
+  },
+  "description": {
+    "en": "Long-term memory for DeepSeek Harness: AST-indexed, tiered SQLite with embeddings and cross-session recall.",
+    "zh": "为 DeepSeek Harness 提供长期记忆：AST 索引、分层 SQLite、向量召回，跨会话可继承。"
+  },
+  "metadata": {
+    "categories": {
+      "memory": {
+        "title": {
+          "en": "Memory",
+          "zh": "记忆"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-memory-tree",
+      "title": {
+        "en": "Memory Tree",
+        "zh": "记忆树"
+      },
+      "description": {
+        "en": "Captures conversations into an addressable AST, embeds them, tiers the database, and injects a bounded recall block before each turn.",
+        "zh": "把对话捕获成可寻址的 AST、向量化、分层落盘，并在每轮开始前注入有界的召回块。"
+      },
+      "icon": "icon.svg",
+      "author": "dsh-memory-tree contributors",
+      "homepage": "https://github.com/qinghuaju/dsh-memory-tree",
+      "repository": {
+        "url": "https://github.com/qinghuaju/dsh-memory-tree"
+      },
+      "metadata": {
+        "category": "memory",
+        "keywords": [
+          "dsh",
+          "dsh-plugin",
+          "deepseek-harness",
+          "memory",
+          "long-term-memory",
+          "sqlite",
+          "embedding",
+          "ast",
+          "rag"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.3.0",
+          "publishTimestamp": 1793256797,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/qinghuaju/dsh-memory-tree",
+            "commit": "40ef479665a871c03cf204f479e3b4d4a2eb6703"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.3"
+          }
+        }
+      ]
+    }
+  ]
+}
