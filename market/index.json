@@ -52,11 +52,9 @@
       "versions": [
         {
           "version": "0.3.0",
-          "publishTimestamp": 1793256797,
+          "publishTimestamp": 1793260079,
           "source": {
-            "type": "git",
-            "url": "https://github.com/qinghuaju/dsh-memory-tree",
-            "commit": "40ef479665a871c03cf204f479e3b4d4a2eb6703"
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.1-rc.3"
