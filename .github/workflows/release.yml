@@ -1,0 +1,58 @@
+name: release
+
+# Publishes to npm with Trusted Publishing (OIDC) — no npm token and no OTP.
+# Prerequisite, once per package: npmjs.com → package → Settings → Trusted
+# Publisher → GitHub Actions, owner `qinghuaju`, repository `dsh-memory-tree`,
+# workflow `release.yml`, environment (none).
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # required for the OIDC exchange with the npm registry
+
+jobs:
+  publish:
+    name: verify and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Offline engine suite
+        run: node scripts/selftest.mjs
+
+      - name: Syntax check
+        run: |
+          node --check src/plugin.mjs
+          node --check src/engine/engine.mjs
+          node --check src/dsh/engine-host.mjs
+
+      - name: Secret scan
+        run: node scripts/check-secrets.mjs
+
+      - name: Market index
+        run: node scripts/check-market.mjs
+
+      - name: Version already on the registry?
+        id: check
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if npm view "dsh-memory-tree@$version" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$version is already on npm, nothing to do"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        if: steps.check.outputs.published == 'false'
+        run: |
+          npm --version
+          npm publish --access public --provenance
