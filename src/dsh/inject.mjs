@@ -3,14 +3,28 @@
  *
  * The plugin never mutates the user's message: it appends one additional
  * `user`-role message carrying the `<memory-recall>` block, tagged with a
- * `plugin`/`recall` source so it is (a) durable like any other context and
+ * producer-owned source so it is (a) durable like any other context and
  * (b) recognisable on replay, so the capture path can skip it.
+ *
+ * Session format v4 rejects the retired `{ kind: 'plugin', plugin: '<name>' }`
+ * wrapper ("format v4 message requires a producer-owned source kind") and
+ * migrates it to `plugin:<name>`. A third-party plugin must emit the migrated
+ * shape directly, or every turn that injects a recall block fails to load.
  *
  * @module dsh-memory-tree/dsh/inject
  */
 
 import { createHash } from 'node:crypto';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
+
+/**
+ * Producer-owned source kind for the injected recall block.
+ *
+ * Session format v4 derives exactly this value (`plugin:` + package name) when
+ * it migrates the retired wrapper, and refuses to load a message whose source
+ * kind is the bare string `plugin`.
+ */
+export const RECALL_SOURCE_KIND = 'plugin:dsh-memory-tree';
 
 /** Concatenate the text blocks of one message. */
 export function textOfMessage(message) {
@@ -49,7 +63,12 @@ export function isHumanMessage(message) {
 
 /** True for messages this plugin injected earlier. */
 export function isMemoryMessage(message) {
-  return message?.source?.kind === 'plugin' && message?.source?.plugin === 'dsh-memory-tree';
+  const source = message?.source;
+  if (!source) return false;
+  // v4 producer-owned kind; falls back to the retired v3 wrapper so memories
+  // written by 0.4.0 and earlier stay recognisable.
+  if (source.kind === RECALL_SOURCE_KIND) return true;
+  return source.kind === 'plugin' && source.plugin === 'dsh-memory-tree';
 }
 
 /**
@@ -95,7 +114,7 @@ export function shouldSkipQuery(query, config) {
 export function buildRecallMessage(block) {
   return createUserMessage({
     content: [{ type: 'text', text: block }],
-    source: { kind: 'plugin', plugin: 'dsh-memory-tree', form: 'recall' },
+    source: { kind: RECALL_SOURCE_KIND, form: 'recall' },
   });
 }
 

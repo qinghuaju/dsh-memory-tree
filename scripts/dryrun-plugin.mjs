@@ -206,7 +206,11 @@ try {
   });
   check('injects one extra message', decision.messages.length === 2, `len=${decision.messages.length}`);
   const injected = decision.messages.at(-1);
-  check('injected message is a recall', injected?.source?.kind === 'plugin' && injected?.source?.form === 'recall');
+  check(
+    'injected message is a recall',
+    injected?.source?.kind === 'plugin:dsh-memory-tree' && injected?.source?.form === 'recall',
+    JSON.stringify(injected?.source ?? {}),
+  );
   check(
     'injected text is a memory block',
     injected?.content?.[0]?.text?.startsWith('<memory-recall'),
@@ -242,6 +246,15 @@ try {
     crossText.includes('绿藻') || crossText.includes('像素'),
     crossText.slice(0, 120),
   );
+  // Session format v4 refuses `{ kind: 'plugin', plugin: ... }` ("format v4
+  // message requires a producer-owned source kind"), so the injected message
+  // must carry the migrated producer-owned kind.
+  const injectedSource = crossSession.messages.at(-1)?.source ?? {};
+  check(
+    'injected recall source is producer-owned (v4)',
+    injectedSource.kind === 'plugin:dsh-memory-tree' && injectedSource.plugin === undefined,
+    JSON.stringify(injectedSource),
+  );
 
   console.log('\nCapture hygiene');
   const beforeSkip = (await statsTool.execute({}, exec)).documents;
@@ -250,6 +263,16 @@ try {
     time: new Date().toISOString(),
     data: createUserMessage({
       content: [{ type: 'text', text: '这是插件自己注入的召回块，不应该被再次捕获'.repeat(3) }],
+      source: { kind: 'plugin:dsh-memory-tree', form: 'recall' },
+    }),
+  });
+  // 0.4.0 injected the retired wrapper; sessions written by it must still be
+  // recognised as plugin output rather than remembered as user text.
+  ctx.emit('session/event', workspace, {
+    type: 'user/message',
+    time: new Date().toISOString(),
+    data: createUserMessage({
+      content: [{ type: 'text', text: '旧版本插件注入的召回块，同样不应该被捕获'.repeat(3) }],
       source: { kind: 'plugin', plugin: 'dsh-memory-tree', form: 'recall' },
     }),
   });

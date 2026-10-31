@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows SemVer.
 
+## [0.4.1] — 2026-10-31
+
+### Fixed
+
+- **Recall injection broke the whole turn on session-format v4**: the injected
+  `<memory-recall>` message was tagged with the retired `{ kind: 'plugin', plugin:
+  'dsh-memory-tree' }` wrapper. V4 refuses that shape (`format v4 message requires a
+  producer-owned source kind`), so with `recall.autoInject: true` **every turn failed**
+  and the machine was left unusable — the exact signature of the incidents recorded in
+  the 0.4.0 notes. The injected source is now the migrated producer-owned kind
+  `plugin:dsh-memory-tree` (no `plugin` field); `isMemoryMessage` still recognises the
+  old wrapper so blocks injected by 0.4.0 are not captured as user text.
+- The dry-run asserts the injected source shape, so a regression fails the suite instead
+  of only showing up on a machine that enforces v4.
+
 ## [0.4.0] — 2026-10-30
 
 ### Security
