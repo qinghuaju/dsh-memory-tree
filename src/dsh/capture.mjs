@@ -13,6 +13,7 @@
  */
 
 import { createLogger } from '../engine/log.mjs';
+import { redactSecrets } from '../engine/redact.mjs';
 
 /**
  * @param {{ engine: object, config: object, logger?: object }} deps
@@ -68,7 +69,12 @@ export function createCaptureBuffer({ engine, config, logger = createLogger({ le
      */
     push(entry) {
       if (disposed || !config.capture.enabled) return;
-      const text = String(entry.text ?? '').trim();
+      const raw = String(entry.text ?? '').trim();
+      const redaction = redactSecrets(raw);
+      if (redaction.redacted) {
+        logger.warn?.(`redacted ${redaction.kinds.join(', ')} before capture (${entry.role})`);
+      }
+      const text = redaction.text;
       if (text.length < config.capture.minChars) {
         logger.debug?.(`skip ${entry.role}: ${text.length} < ${config.capture.minChars} chars`);
         return;

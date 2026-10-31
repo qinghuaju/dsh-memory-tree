@@ -129,6 +129,24 @@ export const DEFAULT_CONFIG = {
 
     /** Override the instruction line rendered inside `<memory-recall>`. */
     header: '',
+
+    /**
+     * Conclusion bias. Ranking favours a conversation's opening framing, so the
+     * decision it actually converged on (near the end) frequently never reaches
+     * the block. When one document dominates the result set, force up to
+     * `slots` of its tail nodes in, replacing the weakest results.
+     *
+     * `minSimilarity` is the cosine floor for an injected tail node: a drifted
+     * conversation whose tail is off-topic must not pollute the block.
+     */
+    conclusionBias: {
+      enabled: true,
+      slots: 1,
+      minSimilarity: 0.45,
+      /** Tail = nodes whose id is at or after this fraction of the doc's id range. */
+      tailFraction: 0.8,
+      maxCandidates: 12,
+    },
   },
 
   tools: {
@@ -273,6 +291,13 @@ export function resolveConfig(raw = {}, { env = process.env, cwd = process.cwd()
     skipQueryPrefixes: Array.isArray(merged.recall.skipQueryPrefixes)
       ? merged.recall.skipQueryPrefixes.map(String)
       : DEFAULT_CONFIG.recall.skipQueryPrefixes,
+    conclusionBias: {
+      enabled: merged.recall.conclusionBias?.enabled !== false,
+      slots: clampInt(merged.recall.conclusionBias?.slots, 0, 4, 1),
+      minSimilarity: clampNumber(merged.recall.conclusionBias?.minSimilarity, 0, 1, 0.45),
+      tailFraction: clampNumber(merged.recall.conclusionBias?.tailFraction, 0.3, 1, 0.8),
+      maxCandidates: clampInt(merged.recall.conclusionBias?.maxCandidates, 1, 200, 12),
+    },
   };
 
   const capture = {

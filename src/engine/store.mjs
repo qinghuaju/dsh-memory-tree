@@ -435,6 +435,32 @@ export class MemoryStore {
       .all(docId);
   }
 
+  /** Inclusive id range of one document's nodes, or null when it has none. */
+  docIdRange(docId) {
+    const row = this.requireDb()
+      .prepare('SELECT MIN(id) AS lo, MAX(id) AS hi FROM nodes WHERE doc_id = ?')
+      .get(docId);
+    return row && row.lo != null ? { lo: Number(row.lo), hi: Number(row.hi) } : null;
+  }
+
+  /**
+   * Newest (highest-id) live nodes of one document at or after `minId`.
+   *
+   * Ids are assigned in writing order, so the tail of a document is the end of
+   * the conversation — where its conclusions live. Used by conclusion bias.
+   */
+  tailNodesForDoc(spaceIds, docId, minId, limit = 12) {
+    const db = this.requireDb();
+    const spaces = [...new Set(spaceIds.map(Number).filter(Number.isFinite))];
+    const filter = spaces.length > 0 ? ` AND space_id IN (${spaces.map(() => '?').join(',')})` : '';
+    return db
+      .prepare(
+        `SELECT * FROM nodes WHERE doc_id = ? AND id >= ? AND archived = 0${filter}
+           ORDER BY id DESC LIMIT ?`,
+      )
+      .all(Number(docId), Number(minId), ...spaces, Number(limit));
+  }
+
   deleteNodesByDoc(docId) {
     const ids = this.requireDb()
       .prepare('SELECT id FROM nodes WHERE doc_id = ?')

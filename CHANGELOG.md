@@ -3,6 +3,30 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows SemVer.
 
+## [0.4.0] — 2026-10-30
+
+### Security
+
+- **Credential redaction at the ingestion boundary**: capture is unconditional, so a token
+  pasted into a chat (or printed by the model) used to land in the store, get embedded, be
+  written into the mirror Markdown — and resurface inside later prompts. `redactSecrets()`
+  now replaces known credential shapes (GitHub `ghp_`/`gho_`/`ghs_`/`ghu_`/`ghr_`, fine-grained
+  `github_pat_`, `npm_`, `sk-`/`sk-ant-`, `AKIA…`, `xox[baprs]-`, PEM private-key blocks) with
+  `[REDACTED:<kind>]` before the text is buffered. Applied in `capture.push`, `engine.remember`
+  (which `mem_store` also goes through) and to the derived title. Ordinary prose
+  (`npm_package`, `sk-learn`) is untouched.
+
+### Added
+
+- **Conclusion bias (recall)**: ranking is dominated by query similarity, which in a long
+  conversation concentrates on its opening framing — measured offline, only 35% of 10-node
+  blocks (and 15% of 6-node blocks) reached the document's own final 30%. When one document
+  dominates the result set, up to `recall.conclusionBias.slots` of its tail nodes are now
+  forced in, evicting the weakest early node, filtered by `minSimilarity` so a drifted
+  conversation's tail cannot pollute the block. Same 20-query replay: 35%→95% at 10 nodes,
+  15%→85% at 6 nodes, median block size unchanged (2323→2296 chars).
+  Config: `recall.conclusionBias { enabled, slots, minSimilarity, tailFraction, maxCandidates }`.
+
 ## [0.3.0] — publishable bundle
 
 First release shaped for distribution outside this machine.

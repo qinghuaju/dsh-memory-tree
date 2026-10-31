@@ -152,6 +152,98 @@ export function rankCandidates({
   return diversified;
 }
 
+/**
+ * Pick nodes from the tail of the dominating document to force into the block.
+ *
+ * Ranking is dominated by semantic similarity to the query, which in a long
+ * conversation concentrates on its opening framing ("what we were talking
+ * about"), not on what it concluded. Tail candidates are still filtered by the
+ * same query similarity, so a drifted conversation contributes nothing: its
+ * tail is no longer about the query and fails `minSimilarity`.
+ *
+ * @param {object} input
+ * @param {Array<{ key: string, node: any }>} input.selected - current result set.
+ * @param {Array<{ key: string, node: any }>} input.candidates - tail nodes of the dominant doc.
+ * @param {(key: string) => ({ vec: Float32Array, norm: number } | undefined)} input.vectorOf
+ * @param {Float32Array} input.queryVector
+ * @param {number} [input.slots] - how many tail nodes to force in.
+ * @param {number} [input.minSimilarity] - cosine floor.
+ * @returns {Array<{ key: string, node: any, sim: number }>}
+ */
+export function pickConclusionNodes({
+  selected,
+  candidates,
+  vectorOf,
+  queryVector,
+  slots = 1,
+  minSimilarity = 0.45,
+}) {
+  if (slots <= 0 || !queryVector) return [];
+  const have = new Set(selected.map((item) => item.key));
+  /** A tail node that repeats an already-selected paragraph buys nothing. */
+  const seenText = new Set(
+    selected.map((item) => String(item.node?.content ?? '').trim()).filter(Boolean),
+  );
+  const scored = [];
+  for (const candidate of candidates) {
+    if (have.has(candidate.key)) continue;
+    const text = String(candidate.node?.content ?? '').trim();
+    if (text && seenText.has(text)) continue;
+    const vector = vectorOf(candidate.key);
+    if (!vector) continue;
+    const sim = dot(queryVector, vector.vec, 1, vector.norm);
+    if (!Number.isFinite(sim) || sim < minSimilarity) continue;
+    scored.push({ ...candidate, sim });
+  }
+  scored.sort((a, b) => b.sim - a.sim);
+  return scored.slice(0, slots);
+}
+
+/**
+ * Merge forced tail nodes into the result set without growing it.
+ *
+ * The node that gets displaced is the weakest **evictable** one, where a node is
+ * protected only when it is a tail node *of the dominant document* — `doc_id`
+ * must match as well as `id >= cut`. Ids are per-database, so a node from
+ * another document with a numerically larger id is not a conclusion of anything
+ * and stays evictable.
+ *
+ * The forced node is placed **first**: `renderRecallBlock` stops adding nodes
+ * once `maxChars` is reached, so anything appended last is the first thing the
+ * budget drops — the one thing that must not happen to a conclusion.
+ *
+ * @param {object} input
+ * @param {Array<{ key: string, node: any, score: number, reasons?: string[] }>} input.items
+ * @param {Array<{ key: string, node: any, score: number, sim?: number }>} input.injected
+ * @param {number} input.cut - id threshold that marks the tail region of `mainDocId`.
+ * @param {number} [input.mainDocId] - the dominant document the cut was computed for.
+ */
+export function mergeConclusionNodes({ items, injected, cut, mainDocId }) {
+  const out = [...items];
+  for (const extra of injected) {
+    if (out.length === 0) {
+      out.push(extra);
+      continue;
+    }
+    let dropIndex = -1;
+    let dropScore = Infinity;
+    for (let index = 0; index < out.length; index += 1) {
+      const node = out[index].node;
+      const isOwnConclusion =
+        Number(node.id) >= cut && (mainDocId === undefined || Number(node.doc_id) === Number(mainDocId));
+      if (isOwnConclusion) continue;
+      const score = Number(out[index].score) || 0;
+      if (score < dropScore) {
+        dropScore = score;
+        dropIndex = index;
+      }
+    }
+    if (dropIndex >= 0) out.splice(dropIndex, 1);
+    out.unshift({ ...extra, score: Number(extra.sim ?? extra.score ?? 0), reasons: ['conclusion'] });
+  }
+  return out;
+}
+
 function dot(a, b, normA = 1, normB = 1) {
   const length = Math.min(a.length, b.length);
   let sum = 0;

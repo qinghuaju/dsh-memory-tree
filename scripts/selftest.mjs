@@ -12,7 +12,8 @@ import { join } from 'node:path';
 import { createMemoryEngine } from '../src/engine/engine.mjs';
 import { resolveConfig } from '../src/engine/config.mjs';
 import { parseMemoryTree, tokenize } from '../src/engine/ast.mjs';
-import { renderRecallBlock, sanitizeMemoryText } from '../src/engine/recall.mjs';
+import { renderRecallBlock, sanitizeMemoryText, pickConclusionNodes, mergeConclusionNodes } from '../src/engine/recall.mjs';
+import { redactSecrets } from '../src/engine/redact.mjs';
 import { projectSpace, recallSpaces } from '../src/engine/space.mjs';
 
 const args = new Set(process.argv.slice(2));
@@ -171,7 +172,60 @@ try {
   );
   check('render escapes inner frame tags', (rendered.match(/<\/memory-recall>/g) ?? []).length === 1, rendered);
 
-  section('Consolidation');
+  section('Conclusion bias');
+
+const cbUnit = (value) => ({ vec: Float32Array.from([value, 0, 0]), norm: 1 });
+const cbItems = [
+  { key: 'hot:1', node: { id: 1, doc_id: 7, content: 'opening' }, score: 0.9 },
+  { key: 'hot:2', node: { id: 2, doc_id: 7, content: 'middle' }, score: 0.5 },
+  { key: 'hot:3', node: { id: 3, doc_id: 9, content: 'other doc' }, score: 0.4 },
+];
+const cbCandidates = [
+  { key: 'hot:100', node: { id: 100, doc_id: 7, content: 'tail conclusion' } },
+  { key: 'hot:101', node: { id: 101, doc_id: 7, content: 'tail off topic' } },
+  { key: 'hot:102', node: { id: 102, doc_id: 7, content: 'middle' } },
+];
+const cbPicked = pickConclusionNodes({
+  selected: cbItems,
+  candidates: cbCandidates,
+  vectorOf: (key) => (key === 'hot:101' ? cbUnit(0.2) : cbUnit(1)),
+  queryVector: Float32Array.from([1, 0, 0]),
+  slots: 2,
+  minSimilarity: 0.45,
+});
+check('conclusion: keeps only candidates above the floor', cbPicked.length === 1 && cbPicked[0].key === 'hot:100');
+check('conclusion: skips text already in the block', !cbPicked.some((item) => item.key === 'hot:102'));
+
+const cbMerged = mergeConclusionNodes({ items: cbItems, injected: cbPicked, cut: 50, mainDocId: 7 });
+check('conclusion: injected node takes the first position', cbMerged[0].key === 'hot:100');
+check('conclusion: evicts the weakest non-tail node', !cbMerged.some((item) => item.key === 'hot:3'));
+check('conclusion: never grows the block', cbMerged.length === cbItems.length);
+
+const cbForeign = [
+  { key: 'hot:1', node: { id: 1, doc_id: 7, content: 'opening' }, score: 0.9 },
+  { key: 'hot:9', node: { id: 900, doc_id: 9, content: 'foreign high id' }, score: 0.2 },
+];
+const cbForeignMerged = mergeConclusionNodes({
+  items: cbForeign,
+  injected: [{ key: 'hot:100', node: { id: 100, doc_id: 7, content: 'tail' }, sim: 0.9 }],
+  cut: 50,
+  mainDocId: 7,
+});
+check('conclusion: foreign high-id node is still evictable', !cbForeignMerged.some((item) => item.key === 'hot:9'));
+check('conclusion: own tail node is protected', cbForeignMerged.some((item) => item.key === 'hot:100'));
+
+section('Credential redaction');
+
+const fakeGithub = `ghp_${'a'.repeat(36)}`;
+const fakeNpm = `npm_${'b'.repeat(36)}`;
+const redOne = redactSecrets(`token ${fakeGithub} end`);
+check('redaction: github token replaced', redOne.redacted && redOne.text.includes('[REDACTED:github_token]') && !redOne.text.includes(fakeGithub));
+const redTwo = redactSecrets(`token ${fakeNpm}`);
+check('redaction: npm token replaced', redTwo.kinds.includes('npm_token') && !redTwo.text.includes(fakeNpm));
+const redThree = redactSecrets('npm_package and sk-learn are ordinary words');
+check('redaction: ordinary prose untouched', !redThree.redacted);
+
+section('Consolidation');
   const dream = await engine.dream({ cwd: projectA });
   check('dream completes', Array.isArray(dream.spaces) && dream.spaces.length > 0, JSON.stringify(dream));
   check('dream keeps nodes', engine.store.listSpaceStats().some((space) => space.nodes > 0));

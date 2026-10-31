@@ -99,6 +99,13 @@ export const Config = z.object({
     scope: z.string(),
     skipQueryPrefixes: z.array(z.string()),
     header: z.string(),
+    conclusionBias: z.object({
+      enabled: z.boolean(),
+      slots: z.number().step(1).min(0).max(4),
+      minSimilarity: z.number().min(0).max(1),
+      tailFraction: z.number().min(0.3).max(1),
+      maxCandidates: z.number().step(1).min(1).max(200),
+    }),
   }),
 
   tools: z.object({

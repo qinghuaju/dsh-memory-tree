@@ -22,9 +22,10 @@ import { createLogger } from './log.mjs';
 import { resolveConfig } from './config.mjs';
 import { MemoryStore, sha256 } from './store.mjs';
 import { createEmbedder } from './embed.mjs';
+import { redactSecrets } from './redact.mjs';
 import { deriveTitle, normalizeText, parseMemoryTree, tokenize } from './ast.mjs';
 import { GLOBAL_SPACE, displayPath, projectSpace, recallSpaces } from './space.mjs';
-import { rankCandidates, renderRecallBlock, renderResultsText } from './recall.mjs';
+import { rankCandidates, renderRecallBlock, renderResultsText, pickConclusionNodes, mergeConclusionNodes } from './recall.mjs';
 
 const SIMILAR_THRESHOLD = 0.72;
 const SIMILAR_NEIGHBORS = 3;
@@ -251,13 +252,17 @@ export function createMemoryEngine(rawConfig = {}, options = {}) {
   async function remember(input) {
     init();
     const store = hotStore();
-    const text = normalizeText(input.text);
+    const redaction = redactSecrets(input.text);
+    const text = normalizeText(redaction.text);
     if (!text) throw new Error('remember: empty text');
+    if (redaction.redacted) {
+      logger.warn?.(`redacted ${redaction.kinds.join(', ')} before storing`);
+    }
     const space = spaceFor(input);
     const spaceRow = store.ensureSpace(space);
     const hash = sha256(text);
     const createdAt = input.createdAt ?? new Date().toISOString();
-    const title = deriveTitle(input.title || firstHeading(text) || text, 80);
+    const title = redactSecrets(deriveTitle(input.title || firstHeading(text) || text, 80)).text;
 
     const inserted = store.insertDocument({
       spaceId: spaceRow.id,
@@ -477,8 +482,59 @@ export function createMemoryEngine(rawConfig = {}, options = {}) {
     }
 
     const topRanked = ranked.slice(0, limit);
+
+    /**
+     * Conclusion bias: when one document dominates the result set, force its
+     * tail — where the decision lives — into the block, evicting the weakest
+     * early node. Never fails the recall: any error degrades to plain ranking.
+     */
+    const bias = config.recall.conclusionBias;
+    let finalRanked = topRanked;
+    if (bias?.enabled && bias.slots > 0 && limit >= 3 && topRanked.length >= 2 && queryVector) {
+      try {
+        const docCounts = new Map();
+        for (const item of topRanked) {
+          const docId = Number(item.node.doc_id);
+          docCounts.set(docId, (docCounts.get(docId) ?? 0) + 1);
+        }
+        let mainDocId = null;
+        let mainCount = 0;
+        for (const [docId, count] of docCounts) {
+          if (count > mainCount) {
+            mainDocId = docId;
+            mainCount = count;
+          }
+        }
+        const anchor = mainDocId == null ? null : topRanked.find((item) => Number(item.node.doc_id) === mainDocId);
+        if (anchor && mainCount >= 2) {
+          const tier = anchor.node.tier;
+          const store = stores.get(tier);
+          const range = store?.docIdRange(mainDocId);
+          if (range) {
+            const cut = range.lo + bias.tailFraction * (range.hi - range.lo);
+            const spaceIds = [Number(anchor.node.space_id)];
+            const candidates = store
+              .tailNodesForDoc(spaceIds, mainDocId, cut, bias.maxCandidates)
+              .map((node) => ({ key: `${tier}:${node.id}`, node: { ...node, tier } }));
+            const injected = pickConclusionNodes({
+              selected: topRanked,
+              candidates,
+              vectorOf: (key) => vectors.get(key),
+              queryVector,
+              slots: bias.slots,
+              minSimilarity: bias.minSimilarity,
+            });
+            finalRanked = mergeConclusionNodes({ items: topRanked, injected, cut, mainDocId });
+          }
+        }
+      } catch (error) {
+        logger.debug?.(`conclusion bias skipped: ${error?.message ?? error}`);
+        finalRanked = topRanked;
+      }
+    }
+
     const touched = new Map();
-    const results = topRanked.map((item) => {
+    const results = finalRanked.map((item) => {
       const [tier, rawId] = splitKey(item.key);
       const nodeId = Number(rawId);
       if (!touched.has(tier)) touched.set(tier, []);
@@ -516,12 +572,12 @@ export function createMemoryEngine(rawConfig = {}, options = {}) {
       }
     }
 
-    const block = renderRecallBlock(topRanked, {
+    const block = renderRecallBlock(finalRanked, {
       maxChars: input.maxChars ?? config.recall.maxChars,
       maxNodeChars: config.recall.maxNodeChars,
       header: config.recall.header || undefined,
     });
-    return { query, results, block, text: renderResultsText(topRanked), spaces: usedSpaces };
+    return { query, results, block, text: renderResultsText(finalRanked), spaces: usedSpaces };
   }
 
   /** Retry documents whose embedding failed, in every tier. */

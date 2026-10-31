@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-tree",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AST soft-decision-tree long-term memory for DeepSeek Harness (DSH): SQLite + embeddings, project-scoped, cross-session recall.",
   "type": "module",
   "main": "./src/plugin.mjs",

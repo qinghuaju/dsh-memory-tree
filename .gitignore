@@ -33,3 +33,13 @@ pollinationsApi.md
 acl-recovery/
 .tmp-*
 package-lock.json
+
+# local evaluation artifacts: private conversation text, 600+ MB snapshots,
+# and the raw blocks/paths used for the paper's measurements. Scripts stay.
+eval/*
+!eval/*.py
+!eval/*.mjs
+
+# unpublished paper drafts and internal strategy notes: kept local until the
+# preprint is out (see paper/VENUES.md for the plan)
+paper/

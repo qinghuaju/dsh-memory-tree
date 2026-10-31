@@ -117,6 +117,11 @@ node scripts/install.mjs --copy-to     # 已安装则输出 already installed
 | `recall.skipQueryPrefixes` | `["/","!","#"]` | 跳过命令式输入 |
 | `recall.header` | 内置中文提示 | 覆盖召回块里的说明行 |
 | `recall.vectorCacheMaxNodes` | `60000` | 进程内向量缓存上限（0=关闭） |
+| `recall.conclusionBias.enabled` | `true` | 结论偏置：把主导文档尾部的结论节点强制注入 |
+| `recall.conclusionBias.slots` | `1` | 强制注入的尾部节点数（0–4） |
+| `recall.conclusionBias.minSimilarity` | `0.45` | 尾部节点的余弦下限，低于此值不注入（防止跑题对话污染） |
+| `recall.conclusionBias.tailFraction` | `0.8` | 尾部起点：id 区间后 `1-0.8=20%` |
+| `recall.conclusionBias.maxCandidates` | `12` | 每次最多评估的尾部候选数 |
 | `tools.enabled` | `true` | 工具总开关 |
 | `tools.allowStore` | `true` | 允许 `mem_store` |
 | `tools.allowDream` | `true` | 允许 `mem_dream` |
