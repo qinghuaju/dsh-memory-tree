@@ -26,9 +26,17 @@ export function contextOf(exec, fallbackCwd = process.cwd()) {
 }
 
 /**
- * @param {{ engine: object, config: object, logger: object, cwd?: string }} deps
+ * @param {{ engine: object, config: object, logger: object, cwd?: string,
+ *           diagnostics?: () => { host?: object, injection?: { state: string, reason?: string },
+ *                                 capture?: string } }} deps
  */
-export function createMemoryTools({ engine, config, logger, cwd: fallbackCwd = process.cwd() }) {
+export function createMemoryTools({
+  engine,
+  config,
+  logger,
+  cwd: fallbackCwd = process.cwd(),
+  diagnostics,
+}) {
   const tools = [];
 
   tools.push(
@@ -192,6 +200,7 @@ export function createMemoryTools({ engine, config, logger, cwd: fallbackCwd = p
             sizeBytes: { type: 'number' },
             tiers: { type: 'string' },
             spaces: { type: 'string' },
+            compat: { type: 'string' },
             summary: { type: 'string', required: true },
           },
         },
@@ -211,6 +220,18 @@ export function createMemoryTools({ engine, config, logger, cwd: fallbackCwd = p
         const spaceLines = (stats.spaces ?? [])
           .map((space) => `${space.tier}/${space.key} · docs=${space.documents} nodes=${space.nodes}`)
           .join('\n');
+        const diag = typeof diagnostics === 'function' ? diagnostics() : undefined;
+        const compat = [
+          diag?.injection
+            ? `auto-recall=${diag.injection.state}${diag.injection.reason ? ` (${diag.injection.reason})` : ''}`
+            : '',
+          diag?.capture ? `capture=${diag.capture}` : '',
+          diag?.host
+            ? `host= dsh:${diag.host.dsh} node:${diag.host.node}${diag.host.electron ? ` electron:${diag.host.electron}` : ''}`
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' · ');
         return {
           dbPath: stats.dbPath,
           model: String(stats.embedding?.model ?? 'unknown'),
@@ -220,13 +241,17 @@ export function createMemoryTools({ engine, config, logger, cwd: fallbackCwd = p
           sizeBytes: totals.sizeBytes,
           tiers: tierLines,
           spaces: spaceLines,
+          compat,
           summary: [
             `数据库(热层): ${stats.dbPath}`,
             `嵌入模型: ${stats.embedding?.model ?? 'unknown'} (${stats.embedding?.dimensions ?? '?'} 维)`,
             `合计 文档 ${totals.documents} · 节点 ${totals.nodes} · 待嵌入 ${totals.pending} · 占用 ${formatBytes(totals.sizeBytes)}`,
             tierLines ? `分层:\n${tierLines}` : '分层: （未启用或为空）',
             spaceLines ? `空间:\n${spaceLines}` : '空间: （空）',
-          ].join('\n'),
+            compat ? `兼容性: ${compat}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
         };
       },
       isConcurrencySafe: () => true,

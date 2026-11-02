@@ -306,10 +306,42 @@ try {
   const afterUser = (await statsTool.execute({}, exec)).documents;
   check('genuine user message is captured', afterUser === beforeUser + 1, `${beforeUser} -> ${afterUser}`);
 
+  console.log('\nInjection circuit breaker');
+  const breakerTask = newTask;
+  const beforeBreaker = await ctx.runWaterfall('agent/pre-step', {
+    agent: { session: otherSession },
+    messages: [breakerTask],
+    turn: 7,
+    step: 1,
+    signal: AbortSignal.timeout(10_000),
+  });
+  check('recall injects while the host accepts it', beforeBreaker.messages.length === 2, `len=${beforeBreaker.messages.length}`);
+  // The exact failure a v4 host produced in 0.4.0: the host rejects the turn
+  // right after the injected message, and every later turn would fail too.
+  ctx.emit('agent/error', {
+    agent: { session: otherSession },
+    error: new Error('format v4 message requires a producer-owned source kind'),
+  });
+  const afterBreaker = await ctx.runWaterfall('agent/pre-step', {
+    agent: { session: otherSession },
+    messages: [breakerTask],
+    turn: 8,
+    step: 1,
+    signal: AbortSignal.timeout(10_000),
+  });
+  check('auto-recall is dropped after one failed turn', afterBreaker.messages.length === 1, `len=${afterBreaker.messages.length}`);
+  check(
+    'the degradation is reported, not silent',
+    ctx.logs.some(([level, message]) => level === 'error' && /auto-recall disabled/.test(String(message))),
+  );
+
   console.log('\nDisposal');
   await ctx.dispose();
   check('disposes without throwing', true);
-  check('logged no errors', !ctx.logs.some(([level]) => level === 'error'), JSON.stringify(ctx.logs.filter(([level]) => level === 'error')));
+  const unexpectedErrors = ctx.logs.filter(
+    ([level, message]) => level === 'error' && !/auto-recall disabled/.test(String(message)),
+  );
+  check('logged no unexpected errors', unexpectedErrors.length === 0, JSON.stringify(unexpectedErrors));
 } finally {
   if (keep) console.log(`\nkept: ${dir}`);
   else rmSync(dir, { recursive: true, force: true });

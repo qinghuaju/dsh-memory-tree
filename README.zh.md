@@ -72,8 +72,22 @@ node scripts/check-market.mjs
 
 ## 兼容性
 
-在 DSH **0.2.1-rc.3**（自带 Node 24）上测试，Windows 与 Linux CI；CLI 需要 Node ≥ 22.5。
+在 DSH **0.2.1-rc.3**（自带 Node 24）上测试，CI 覆盖 Windows 与 Linux、Node 22 与 24；CLI 需要 Node ≥ 22.5。
 插件没有原生编译、没有自己的运行时依赖树——`@deepseek-ai/*` 从 profile 解析。
+
+`package.json` 声明了 `engines.dsh`（`^0.2.1-alpha.2`），CI 里的 `npm run compat` 会把
+「DSH 会话格式的注入规则」也当作断言来跑——这类规则变了，是 CI 变红，而不是你的机器变砖。
+
+插件对 DSH 内部变化的降级策略是**逐能力降级**，而不是整体失效：
+
+| 出问题的地方 | 结果 |
+|---|---|
+| 注入消息被宿主拒绝（例如又一次 source kind 变更） | 本轮之后**只关掉自动召回**并写错误日志；捕获与 `mem_recall` 工具照常工作 |
+| `agent/pre-step` 钩子改名/消失 | 自动召回关闭，其余能力保留 |
+| `session/event` 钩子消失 | 捕获关闭，工具与召回仍可用 |
+| 引擎子进程崩溃 | 自动重启；对话不受影响 |
+
+`mem_stats` 会输出一行 `compat:`，直接看出当前是正常、降级还是关闭。
 
 
 ## 为什么不直接用向量库

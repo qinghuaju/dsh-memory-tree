@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-tree",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "AST soft-decision-tree long-term memory for DeepSeek Harness (DSH): SQLite + embeddings, project-scoped, cross-session recall.",
   "type": "module",
   "main": "./src/plugin.mjs",
@@ -22,7 +22,8 @@
     "market"
   ],
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.5.0",
+    "dsh": "^0.2.1-alpha.2"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": ">=0.1.0",
@@ -48,7 +49,8 @@
     "inspect": "node scripts/inspect.mjs",
     "bench": "node scripts/bench.mjs",
     "market": "node scripts/market-index.mjs",
-    "market:check": "node scripts/check-market.mjs"
+    "market:check": "node scripts/check-market.mjs",
+    "compat": "node scripts/check-compat.mjs"
   },
   "keywords": [
     "dsh",

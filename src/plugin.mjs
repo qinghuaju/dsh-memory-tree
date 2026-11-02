@@ -166,6 +166,49 @@ function mount(ctx, rawConfig) {
   });
   const logger = combineLoggers(dshLogger, fileLogger);
 
+  // Best-effort host identification: worth having in plugin.log when a future
+  // DSH build rejects something we emit. Never gates behaviour.
+  const host = {
+    dsh: 'unknown',
+    node: process.versions.node,
+    electron: process.versions.electron ?? null,
+    platform: process.platform,
+  };
+  void (async () => {
+    try {
+      const { app } = await import('electron');
+      host.dsh = app?.getVersion?.() ?? 'unknown';
+      logger.info?.(`host dsh ${host.dsh}`);
+    } catch {
+      // Not an Electron host (dsh web / CLI): the version stays unknown.
+    }
+  })();
+
+  /**
+   * Auto-recall health. Injection is the only part of this plugin that can make
+   * the host reject a turn (it hands DSH a message), so it carries its own
+   * circuit breaker: one failed turn right after an injection disables it for
+   * this process instead of failing every subsequent turn.
+   */
+  const injection = { disabled: '', injectedAt: 0, sessionId: '' };
+  const INJECTION_FAILURE_WINDOW_MS = 20_000;
+  const disableInjection = (reason) => {
+    if (injection.disabled) return;
+    injection.disabled = reason;
+    logger.error?.(
+      `auto-recall disabled for this process: ${reason}. ` +
+        'Capture and the mem_recall tool keep working; a new session retries auto-recall.',
+    );
+  };
+
+  const diagnostics = () => ({
+    host: { ...host },
+    injection: injection.disabled
+      ? { state: 'degraded', reason: injection.disabled }
+      : { state: config.recall.autoInject ? 'on' : 'off' },
+    capture: config.capture.enabled ? 'on' : 'off',
+  });
+
   const client = createEngineClient({ config, logger });
   client.start();
   // Boot the engine eagerly: this records in plugin.log that SQLite opened under
@@ -178,7 +221,7 @@ function mount(ctx, rawConfig) {
   void resolveConfiguredKey(ctx, config, logger);
 
   registerPrompt(ctx, config, logger);
-  registerTools(ctx, config, client, logger);
+  registerTools(ctx, config, client, logger, diagnostics);
 
   const buffer = createCaptureBuffer({ engine: client, config, logger });
   const guard = createInjectionGuard();
@@ -224,6 +267,7 @@ function mount(ctx, rawConfig) {
     const decision = await next();
     try {
       if (!config.recall.enabled || !config.recall.autoInject) return decision;
+      if (injection.disabled) return decision;
       if (decision?.kind !== 'enter') return decision;
       if (Number(payload?.step) !== 1) return decision;
       if (Date.now() < recallCooldownUntil) return decision;
@@ -253,6 +297,8 @@ function mount(ctx, rawConfig) {
         return decision;
       }
       guard.remember(sessionId, turn, query);
+      injection.injectedAt = Date.now();
+      injection.sessionId = sessionId;
       logger.info?.(`injected recall: ${result.results.length} nodes, ${message.content[0].text.length} chars`);
       return next;
     } catch (error) {
@@ -266,12 +312,50 @@ function mount(ctx, rawConfig) {
     }
   };
 
-  try {
-    ctx.on('session/event', onSessionEvent);
-    ctx.on('agent/pre-step', onPreStep);
-  } catch (error) {
-    logger.error?.(`failed to attach listeners: ${error?.message ?? error}`);
-    return;
+  /**
+   * Circuit breaker for the injection path: DSH reports a rejected turn through
+   * `agent/error`, and a rejection that arrives right after we put a message into
+   * the batch is almost certainly about that message. Fail safe — keep the
+   * session usable, keep capture and the tools, drop only auto-recall.
+   */
+  const onAgentError = (payload) => {
+    try {
+      if (!injection.injectedAt) return;
+      if (Date.now() - injection.injectedAt > INJECTION_FAILURE_WINDOW_MS) {
+        injection.injectedAt = 0;
+        return;
+      }
+      const detail = payload?.error?.message ? String(payload.error.message) : 'unknown error';
+      injection.injectedAt = 0;
+      disableInjection(`the turn that received a recall block failed (${detail})`);
+    } catch (error) {
+      logger.debug?.(`agent error inspection failed: ${error?.message ?? error}`);
+    }
+  };
+
+  // Attach listeners independently: a DSH build that renames or drops one hook
+  // must cost us that hook only, never capture, the tools or clean shutdown.
+  const attach = (event, handler, missing) => {
+    try {
+      if (typeof ctx?.on !== 'function') throw new Error('ctx.on is unavailable');
+      ctx.on(event, handler);
+      return true;
+    } catch (error) {
+      missing?.(error);
+      return false;
+    }
+  };
+
+  attach('session/event', onSessionEvent, (error) =>
+    logger.warn?.(`capture unavailable on this DSH build: ${error?.message ?? error}`),
+  );
+  const preStepAttached = attach('agent/pre-step', onPreStep, (error) =>
+    disableInjection(`agent/pre-step is unavailable on this DSH build (${error?.message ?? error})`),
+  );
+  if (preStepAttached) {
+    attach('agent/error', onAgentError, (error) =>
+      logger.debug?.(`agent/error unavailable, injection circuit breaker degraded: ${error?.message ?? error}`),
+    );
   }
 
   let retrying = false;
@@ -389,10 +473,10 @@ async function resolveConfiguredKey(ctx, config, logger) {
   }
 }
 
-function registerTools(ctx, config, client, logger) {
+function registerTools(ctx, config, client, logger, diagnostics) {
   if (!config.tools.enabled) return;
   try {
-    const tools = createMemoryTools({ engine: client, config, logger });
+    const tools = createMemoryTools({ engine: client, config, logger, diagnostics });
     for (const tool of tools) ctx.tools.register(tool);
   } catch (error) {
     logger.error?.(`tool registration failed: ${error?.message ?? error}`);

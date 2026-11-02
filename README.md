@@ -75,9 +75,23 @@ Full schema, hosting and the official-listing status: **[docs/MARKET.md](docs/MA
 
 ## Compatibility
 
-Tested with DSH **0.2.1-rc.3** (bundled Node 24) on Windows and Linux CI, Node ≥ 22.5 for CLI use.
-The plugin has no native build and no runtime dependency tree of its own — it resolves DSH's
-`@deepseek-ai/*` packages from the profile.
+Tested with DSH **0.2.1-rc.3** (bundled Node 24) on Windows and Linux CI, Node 22 and 24; Node ≥ 22.5
+for CLI use. The plugin has no native build and no runtime dependency tree of its own — it resolves
+DSH's `@deepseek-ai/*` packages from the profile.
+
+`package.json` declares `engines.dsh` (`^0.2.1-alpha.2`), and `npm run compat` in CI asserts the
+session-format injection rules too, so a DSH rule change turns CI red instead of breaking an install.
+
+DSH-side changes degrade capability by capability rather than all at once:
+
+| What breaks | What happens |
+|---|---|
+| The host rejects the injected message (e.g. another source-kind change) | auto-recall is switched off after that turn and logged; capture and the `mem_recall` tool keep working |
+| `agent/pre-step` is renamed or gone | auto-recall is off, everything else stays |
+| `session/event` is gone | capture is off, the tools and recall stay |
+| The engine child process crashes | it restarts; the conversation is unaffected |
+
+`mem_stats` prints a `compat:` line showing normal, degraded or off.
 
 
 ## Why not just a vector store?

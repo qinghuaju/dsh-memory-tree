@@ -13,11 +13,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        # The plugin supports Node >=22.5; both maintained lines get tested so a
+        # future runtime change shows up here rather than on a user's machine.
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
       - name: Offline engine suite (AST, SQLite, recall, tiering, recovery)
         run: node scripts/selftest.mjs
       - name: Syntax check
@@ -27,8 +30,12 @@ jobs:
           node --check scripts/install.mjs
           node --check src/dsh/engine-host.mjs
           node --check scripts/market-index.mjs
+          node --check src/dsh/source-kind.mjs
+          node --check scripts/check-compat.mjs
       - name: Secret scan
         run: node scripts/check-secrets.mjs
+      - name: Compatibility guard (engines, v4 source rules, shipped sources)
+        run: node scripts/check-compat.mjs
       - name: Bundle patch present
         run: test -f cordis.patch.yml
       - name: Market index (optional)

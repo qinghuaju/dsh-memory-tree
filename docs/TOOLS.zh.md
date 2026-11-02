@@ -67,8 +67,9 @@
 
 ### `mem_stats`
 
-无参数。返回 `{ dbPath, model, documents, nodes, pending, sizeBytes, tiers, spaces, summary }`，
-包含分层与空间明细。
+无参数。返回 `{ dbPath, model, documents, nodes, pending, sizeBytes, tiers, spaces, compat, summary }`，
+包含分层、空间与兼容性明细。`compat` 会给出自动召回状态（`on` / `off` / 带原因的 `degraded`）、
+捕获开关与探测到的宿主版本——记忆看起来是空的、或者自动召回好像没生效时，先读这一行。
 
 ### `mem_dream`
 

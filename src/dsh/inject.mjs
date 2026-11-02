@@ -16,15 +16,9 @@
 
 import { createHash } from 'node:crypto';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
+import { RECALL_SOURCE_KIND, isMemorySource } from './source-kind.mjs';
 
-/**
- * Producer-owned source kind for the injected recall block.
- *
- * Session format v4 derives exactly this value (`plugin:` + package name) when
- * it migrates the retired wrapper, and refuses to load a message whose source
- * kind is the bare string `plugin`.
- */
-export const RECALL_SOURCE_KIND = 'plugin:dsh-memory-tree';
+export { RECALL_SOURCE_KIND };
 
 /** Concatenate the text blocks of one message. */
 export function textOfMessage(message) {
@@ -63,12 +57,7 @@ export function isHumanMessage(message) {
 
 /** True for messages this plugin injected earlier. */
 export function isMemoryMessage(message) {
-  const source = message?.source;
-  if (!source) return false;
-  // v4 producer-owned kind; falls back to the retired v3 wrapper so memories
-  // written by 0.4.0 and earlier stay recognisable.
-  if (source.kind === RECALL_SOURCE_KIND) return true;
-  return source.kind === 'plugin' && source.plugin === 'dsh-memory-tree';
+  return isMemorySource(message?.source);
 }
 
 /**

@@ -74,8 +74,10 @@ Identical content is deduped by hash and reported as `deduped: true`.
 
 ### `mem_stats`
 
-No parameters. Returns `{ dbPath, model, documents, nodes, pending, sizeBytes, tiers, spaces, summary }`
-including per-tier and per-space lines.
+No parameters. Returns `{ dbPath, model, documents, nodes, pending, sizeBytes, tiers, spaces, compat, summary }`
+including per-tier, per-space and compatibility lines. `compat` reports the auto-recall state
+(`on`, `off` or `degraded` with its reason), capture, and the detected host version — read it first
+when memory looks stale or auto-recall seems to do nothing.
 
 ### `mem_dream`
 

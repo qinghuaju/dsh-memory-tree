@@ -3,6 +3,39 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows SemVer.
 
+## [0.4.2] — 2026-11-02
+
+Future-proofing only: no new memory features, no behaviour change on a healthy host.
+
+### Added
+
+- **Injection circuit breaker**: if the turn that received a recall block fails — DSH reports
+  `agent/error` within 20 s of the injection — auto-recall is disabled for that process and the
+  reason is logged at error level. Capture and the `mem_recall` tool keep working, so the worst
+  case becomes "no automatic recall" instead of "the host rejects every turn". A new session
+  retries. This is the failure mode a v4 build produced in 0.4.0.
+- **Compatibility guard** (`npm run compat`, wired into CI): asserts `engines.dsh`, the v4
+  producer-owned source rule, the shipped injection kind and that `inject.mjs` never hard-codes
+  the retired `kind: 'plugin'` wrapper. A DSH rule change now fails CI, not a user's machine.
+- `mem_stats` returns a `compat` line (auto-recall state, capture, host version) so a degraded
+  install is diagnosable from inside the conversation.
+
+### Changed
+
+- `package.json` declares `engines.dsh` (`^0.2.1-alpha.2`), matching the DSH line this plugin is
+  built and tested against.
+- Listener attachment is per hook: a build that renames `agent/pre-step`, drops `session/event`
+  or removes the event bus costs only that hook. Capture, the tools and clean shutdown no longer
+  depend on every hook attaching.
+- `src/dsh/source-kind.mjs` holds the producer-owned source rules without DSH imports, so the
+  dry-run, the compat guard and the plugin share one definition.
+- CI runs the suite on Node 22 and 24.
+
+### Fixed
+
+- A single failed listener attach used to abandon the rest of `mount`, skipping the retry and
+  rotation timers and the dispose hook.
+
 ## [0.4.1] — 2026-10-31
 
 ### Fixed
