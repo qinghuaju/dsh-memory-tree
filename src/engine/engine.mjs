@@ -260,6 +260,15 @@ export function createMemoryEngine(rawConfig = {}, options = {}) {
     }
     const space = spaceFor(input);
     const spaceRow = store.ensureSpace(space);
+    // A retried capture remains idempotent even after its document was rotated.
+    if (input.externalId) {
+      for (const { tier, store: candidate } of activeStores()) {
+        const previous = candidate.getDocumentByExternalId(space.key, input.source ?? 'manual', input.externalId);
+        if (previous?.status === 'ready') {
+          return { documentId: Number(previous.id), nodeIds: [], nodeCount: 0, deduped: true, space: spaceRow, tier };
+        }
+      }
+    }
     const hash = sha256(text);
     const createdAt = input.createdAt ?? new Date().toISOString();
     const title = redactSecrets(deriveTitle(input.title || firstHeading(text) || text, 80)).text;
@@ -311,7 +320,7 @@ export function createMemoryEngine(rawConfig = {}, options = {}) {
 
   /**
    * Store one captured exchange (user/assistant messages from one turn).
-   * @param {{ sessionId: string, cwd?: string, messages: Array<{role: string, text: string, time?: string}>, importance?: number }} input
+   * @param {{ sessionId: string, cwd?: string, messages: Array<{role: string, text: string, time?: string}>, importance?: number, source?: string, externalId?: string, createdAt?: string }} input
    */
   async function rememberExchange(input) {
     const messages = (input.messages ?? []).filter((message) => normalizeText(message.text));
@@ -329,8 +338,10 @@ export function createMemoryEngine(rawConfig = {}, options = {}) {
       title: deriveTitle(firstUser, 60),
       cwd: input.cwd,
       scope: 'project',
-      source: 'capture',
+      source: input.source ?? 'capture',
       sessionId: input.sessionId,
+      externalId: input.externalId,
+      createdAt: input.createdAt,
       importance: input.importance ?? 0.5,
     });
   }

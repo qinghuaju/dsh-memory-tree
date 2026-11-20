@@ -19,7 +19,7 @@ import { dirname } from 'node:path';
 import { createLogger } from './log.mjs';
 import { likePattern } from './ast.mjs';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE UNIQUE INDEX IF NOT EXISTS documents_space_hash ON documents(space_id, hash);
 CREATE INDEX IF NOT EXISTS documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS documents_created ON documents(created_at);
+CREATE INDEX IF NOT EXISTS documents_external ON documents(space_id, source, external_id);
 
 CREATE TABLE IF NOT EXISTS nodes (
   id           INTEGER PRIMARY KEY,
@@ -227,6 +228,10 @@ export class MemoryStore {
     const row = this.db.prepare('SELECT value FROM meta WHERE key = ?').get('schema_version');
     if (!row) {
       this.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run('schema_version', String(SCHEMA_VERSION));
+    } else if (Number(row.value) < SCHEMA_VERSION) {
+      // v1 -> v2 only adds documents_external. SCHEMA_SQL creates that index
+      // idempotently above; existing documents, vectors and tier files stay intact.
+      this.db.prepare('UPDATE meta SET value = ? WHERE key = ?').run(String(SCHEMA_VERSION), 'schema_version');
     } else if (Number(row.value) > SCHEMA_VERSION) {
       this.logger.warn?.(
         `memory.db schema ${row.value} is newer than this plugin (${SCHEMA_VERSION}); continuing read/write best effort`,
@@ -433,6 +438,13 @@ export class MemoryStore {
     return this.requireDb()
       .prepare('SELECT * FROM nodes WHERE doc_id = ? ORDER BY ordinal')
       .all(docId);
+  }
+
+  getDocumentByExternalId(spaceKey, source, externalId) {
+    return this.requireDb().prepare(
+      `SELECT d.* FROM documents d JOIN spaces s ON s.id = d.space_id
+       WHERE s.key = ? AND d.source = ? AND d.external_id = ? AND d.status = 'ready' ORDER BY d.id LIMIT 1`,
+    ).get(spaceKey, source, externalId);
   }
 
   /** Inclusive id range of one document's nodes, or null when it has none. */

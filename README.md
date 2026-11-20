@@ -1,6 +1,6 @@
 # dsh-memory-tree
 
-**Long-term memory for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — an AST-indexed, tiered SQLite brain that survives sessions.**
+**Long-term memory for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and Codex — an AST-indexed, tiered SQLite brain that survives sessions.**
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A522.5-brightgreen.svg)](https://nodejs.org)
@@ -28,7 +28,23 @@ This plugin makes memory an **asset on disk** instead of a consumable in the con
 
 No external service. No native build. One directory you can copy, inspect, back up, or delete.
 
-## Quick start
+## Codex integration
+
+The existing DSH plugin is joined by Codex MCP tools and automatic memory hooks.
+Use the same data directory and project path to share memories between clients.
+
+```bash
+npm ci
+node scripts/install-codex.mjs --dry-run
+node scripts/install-codex.mjs
+```
+
+Restart Codex and review/trust the new hooks in `/hooks`. Embeddings use the data
+directory's existing configuration and credentials. The default remains
+`~/.dsh/memory-tree`; use `--data-dir` for separate storage. Setup, capture
+boundaries, concurrency and removal: **[docs/CODEX.md](docs/CODEX.md)**.
+
+## DSH quick start
 
 ```bash
 # 1) get the embedding key into place (never into the repo)
@@ -76,8 +92,8 @@ Full schema, hosting and the official-listing status: **[docs/MARKET.md](docs/MA
 ## Compatibility
 
 Tested with DSH **0.2.1-rc.3** (bundled Node 24) on Windows and Linux CI, Node 22 and 24; Node ≥ 22.5
-for CLI use. The plugin has no native build and no runtime dependency tree of its own — it resolves
-DSH's `@deepseek-ai/*` packages from the profile.
+for CLI use. The engine and DSH adapter use Node built-ins and DSH's host packages.
+The Codex adapter/installer add the official MCP SDK, Zod and a TOML parser, with no native build.
 
 `package.json` declares `engines.dsh` (`^0.2.1-alpha.2`), and `npm run compat` in CI asserts the
 session-format injection rules too, so a DSH rule change turns CI red instead of breaking an install.
@@ -260,7 +276,8 @@ of the database.
 - [x] Phase 1 — AST + embeddings + SQLite, capture, auto-recall, tools, tiered files
 - [ ] Phase 2 — offline consolidation: summaries, merge, conflict detection (`supersedes`), BM25
 - [ ] Phase 3 — parameterized memory: rollbackable LoRA adapters trained from recall/decision logs
-- [ ] Phase 4 — MCP server for non-DSH clients, CRDT multi-machine sync, 3D memory graph
+- [x] Codex / MCP — memory tools, automatic recall, prompt/final-reply capture, local DSH sharing
+- [ ] Phase 4 — CRDT multi-machine sync, 3D memory graph
 
 Details: [docs/PHASE1.md](docs/PHASE1.md).
 

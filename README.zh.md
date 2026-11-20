@@ -1,6 +1,6 @@
 # dsh-memory-tree
 
-**给 DeepSeek Harness（DSH）的跨会话长期记忆：AST 结构化索引 + 分层 SQLite + 向量召回。**
+**给 DeepSeek Harness（DSH）和 Codex 的跨会话长期记忆：AST 结构化索引 + 分层 SQLite + 向量召回。**
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A522.5-brightgreen.svg)](https://nodejs.org)
@@ -27,7 +27,21 @@ Agent 会忘事。任务结束，上下文清空，压缩摘要随会话消失�
 
 没有外部服务、没有原生编译；整个"大脑"就是一个目录，可复制、可检查、可备份、可删除。
 
-## 快速开始
+## Codex 接入
+
+保留 DSH 插件，并提供 Codex MCP 工具和自动记忆 Hooks。相同数据目录与项目路径可以共享记忆。
+
+```bash
+npm ci
+node scripts/install-codex.mjs --dry-run
+node scripts/install-codex.mjs
+```
+
+重启 Codex，在 `/hooks` 中审阅并信任新增 Hooks；embedding 沿用数据目录的配置和密钥。
+默认复用 `~/.dsh/memory-tree`，可用 `--data-dir` 指定独立目录。完整配置、捕获范围、
+同机共享和卸载见 **[docs/CODEX.zh.md](docs/CODEX.zh.md)**。
+
+## DSH 快速开始
 
 ```bash
 # 1) 放 key（不要放进仓库）
@@ -73,7 +87,7 @@ node scripts/check-market.mjs
 ## 兼容性
 
 在 DSH **0.2.1-rc.3**（自带 Node 24）上测试，CI 覆盖 Windows 与 Linux、Node 22 与 24；CLI 需要 Node ≥ 22.5。
-插件没有原生编译、没有自己的运行时依赖树——`@deepseek-ai/*` 从 profile 解析。
+引擎和 DSH 适配器只使用 Node 内置模块及宿主提供的 `@deepseek-ai/*`；Codex 接入与安装器使用官方 MCP SDK、Zod 和 TOML 解析器，无需原生编译。
 
 `package.json` 声明了 `engines.dsh`（`^0.2.1-alpha.2`），CI 里的 `npm run compat` 会把
 「DSH 会话格式的注入规则」也当作断言来跑——这类规则变了，是 CI 变红，而不是你的机器变砖。
@@ -234,7 +248,7 @@ node scripts/demo.mjs rotate
 
 **两台机器能共用吗？**
 可以把 `$DSH_HOME/memory-tree/` 拷过去，但**绝不能让两台机同时写同一个 SQLite 文件**。
-只做单向同步，或只对 Markdown 镜像用 git。多写入者的 CRDT 同步在路线图里。
+只做单向同步，或只对 Markdown 镜像用 git。同一台机器上的升级版 DSH 与 Codex 适配器可以通过操作锁协调共享；多机 CRDT 同步仍在路线图里。
 
 **它替代 AGENTS.md / CLAUDE.md 吗？**
 不替代。那是你维护的"指令"，它是 Agent 自己积累的"历史"，两者互补。
@@ -247,7 +261,8 @@ node scripts/demo.mjs rotate
 - [x] Phase 1 — AST + embedding + SQLite、捕获、自动召回、工具、分层文件
 - [ ] Phase 2 — 离线巩固：摘要、合并、冲突检测（`supersedes`）、BM25
 - [ ] Phase 3 — 参数化记忆：从召回/决策日志训练可回滚的 LoRA 适配器
-- [ ] Phase 4 — 给非 DSH 客户端用的 MCP server、CRDT 多机同步、3D 记忆图谱
+- [x] Codex / MCP — 五个记忆工具、自动召回、问题＋最后回复捕获、同机 DSH 共享
+- [ ] Phase 4 — CRDT 多机同步、3D 记忆图谱
 
 细节见 [docs/PHASE1.md](docs/PHASE1.md)。
 

@@ -8,6 +8,7 @@ data/
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
 memory.db*
 local/
 credentials.json
@@ -32,7 +33,6 @@ pollinationsApi.md
 
 acl-recovery/
 .tmp-*
-package-lock.json
 
 # local evaluation artifacts: private conversation text, 600+ MB snapshots,
 # and the raw blocks/paths used for the paper's measurements. Scripts stay.

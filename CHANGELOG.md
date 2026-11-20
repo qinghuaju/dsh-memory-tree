@@ -3,6 +3,35 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows SemVer.
 
+## [Unreleased] — DSH + Codex memory
+
+### Added
+
+- Codex MCP stdio server exposing the five memory tools through the official MCP
+  SDK. Project-sensitive tools require an explicit absolute `cwd`.
+- `UserPromptSubmit`, `Stop`, and `SessionStart` hooks for
+  bounded recall, prompt/final-reply capture, and durable retries. No internal
+  Codex transcript parsing. Capture text is redacted before it reaches the outbox.
+- Synchronous hooks by default for older Codex clients; opt-in `--async-hooks`
+  enables background capture/retry. Recall hook deadlines follow the configured
+  budget, and MCP forwards embedding credential environment variable names.
+- Idempotent Codex installer with dry-run, backups, project/global scopes and
+  uninstall; unrelated MCP/hooks entries and memory files are preserved.
+- A shared isolated runtime and cross-process SQLite operation mutex, so updated
+  DSH and Codex adapters can safely coordinate local writes and tier rotation.
+- Embedding identity checks for shared databases; retries retain source/turn
+  identifiers and remain idempotent after rotation.
+- Offline integration tests, CI coverage, and bilingual Codex setup guides.
+
+### Changed
+
+- Existing DSH client/host paths remain compatibility shims for the shared runtime.
+- `MEMORY_TREE_DATA_DIR` now works directly in core configuration resolution.
+- SQLite schema v2 adds the `documents_external` lookup index. Existing v1 tier
+  files migrate in place on open; document and vector layouts are unchanged.
+- The engine remains dependency-free; Codex integration uses the MCP SDK/Zod and
+  the installer uses a TOML parser to validate merges without rewriting user settings.
+
 ## [0.4.2] — 2026-11-02
 
 Future-proofing only: no new memory features, no behaviour change on a healthy host.
@@ -97,7 +126,7 @@ First release shaped for distribution outside this machine.
   clean tree can be published without false positives.
 - CI checks the bundle patch, the market index (optional) and the new scripts.
 
-## [Unreleased] — injection hardening (verification pending)
+## Historical notes — injection hardening before 0.4.1
 
 Live incidents (21:56 and 15:10 local) share one signature: the first turn after
 enabling `recall.autoInject` is marked `interrupted` **4 ms after `turn/start`**,

@@ -2,8 +2,10 @@
 
 Applies to **dsh-memory-tree 0.2.3** on **DSH 0.2.1-rc.3** (Node 24). English | [中文](TOOLS.zh.md)
 
-This page documents every public surface: the five model-facing tools, the automatic
-recall injection, the engine API for scripts, and the CLI.
+This page documents the DSH tools, automatic recall, engine API and CLI.
+For Codex MCP tools (which require an explicit project `cwd`) and lifecycle hooks,
+see [Codex integration](CODEX.md). Concurrent integrations can import
+`createEngineService` from `dsh-memory-tree/runtime` and use its serialized `request` API.
 
 ---
 

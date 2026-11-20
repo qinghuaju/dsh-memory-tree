@@ -1,17 +1,23 @@
 {
   "name": "dsh-memory-tree",
   "version": "0.4.2",
-  "description": "AST soft-decision-tree long-term memory for DeepSeek Harness (DSH): SQLite + embeddings, project-scoped, cross-session recall.",
+  "description": "Shared long-term memory for DeepSeek Harness and Codex: AST + SQLite + embeddings, MCP tools and lifecycle hooks.",
   "type": "module",
   "main": "./src/plugin.mjs",
   "exports": {
     ".": "./src/plugin.mjs",
-    "./engine": "./src/engine/index.mjs"
+    "./engine": "./src/engine/index.mjs",
+    "./runtime": "./src/runtime/service.mjs"
+  },
+  "bin": {
+    "memory-tree-mcp": "./src/mcp/server.mjs",
+    "memory-tree-codex-hook": "./src/codex/hook.mjs"
   },
   "files": [
     "src",
     "docs",
     "scripts",
+    "tests",
     "README.md",
     "README.zh.md",
     "CHANGELOG.md",
@@ -43,6 +49,10 @@
   },
   "scripts": {
     "selftest": "node scripts/selftest.mjs",
+    "test:codex": "node --test tests/codex.test.mjs",
+    "test:compat": "node scripts/check-compat.mjs && node scripts/test-containment.mjs",
+    "mcp": "node src/mcp/server.mjs",
+    "codex:install": "node scripts/install-codex.mjs",
     "dryrun": "node scripts/dryrun-plugin.mjs",
     "live": "node scripts/selftest.mjs --live",
     "demo": "node scripts/demo.mjs",
@@ -55,6 +65,8 @@
   "keywords": [
     "dsh",
     "dsh-plugin",
+    "codex",
+    "mcp",
     "deepseek-harness",
     "memory",
     "long-term-memory",
@@ -79,5 +91,13 @@
   "homepage": "https://github.com/qinghuaju/dsh-memory-tree#readme",
   "bugs": {
     "url": "https://github.com/qinghuaju/dsh-memory-tree/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "smol-toml": "1.9.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0"
   }
 }

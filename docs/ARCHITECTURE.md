@@ -7,7 +7,7 @@
 
 宿主进程（DSH）只运行一层薄适配：`src/plugin.mjs` + `src/dsh/host-client.mjs`。
 所有可能硬崩的东西——`node:sqlite`、embedding HTTP、AST 解析、轮转、VACUUM——
-都在 fork 出来的子进程 `src/dsh/engine-host.mjs` 里。
+都在 fork 出来的子进程 `src/runtime/engine-host.mjs` 里；旧 DSH 路径保留兼容入口。
 
 ```
 DSH host ──(IPC)──▶ engine host child ──▶ SQLite / embeddings / mirrors
@@ -59,7 +59,22 @@ spawn/exit（含所用运行时）、子进程 stderr、引擎告警。宿主退
 ```
 
 设计原则：**内核不依赖 DSH**。`src/engine/` 只依赖 Node 内置模块与 `fetch`，
-CLI、自测、基准、未来的 MCP server 都能复用；`src/dsh/` 只做适配。
+CLI、自测、基准、MCP server 都能复用；`src/dsh/` 与 `src/codex/` 只做宿主适配。
+
+### Codex 与 DSH 共用运行时
+
+`src/mcp/server.mjs` 用 MCP SDK 暴露五个工具；`src/codex/hook.mjs` 将
+`UserPromptSubmit` 转为召回，将 `Stop` 提供的最后回复与问题合并入库。
+`SessionStart` 重试 `codex-capture.db` 中待处理的完整轮次。每个过程通过相同 IPC 客户端调用隔离引擎。
+
+`src/runtime/service.mjs` 串行调度单进程请求，并在独立的 `memory.db.lock.db` 上持有
+SQLite `BEGIN IMMEDIATE` 事务，协调多个宿主进程。锁库与正文库分离，所以 embedding 的异步等待
+不会占用正文库的事务；进程终止后操作锁由系统释放。引擎的定时轮转也经过这个入口。
+此协调只覆盖升级后的接入层；直接调用底层引擎的脚本需要自行协调并发。
+
+同库保存 embedding 模型/维度身份，阻止两端混用不兼容的向量。Codex 捕获附带
+`source=codex:capture` 和稳定轮次 ID，文档轮转后重试仍能识别已完成的写入。
+MCP 参数要求项目绝对 `cwd`，避免全局进程把启动目录误认为项目；项目空间解析规则保持不变。
 
 ## 2. DSH 集成点
 
@@ -213,7 +228,7 @@ session/event ──▶ 缓冲（按 session）
 - **embedding**：`createEmbedder()` 只依赖 OpenAI 兼容协议，加 provider = 加 preset；
 - **巩固层（L2）**：`documents.text` + `nodes` 已是训练语料工厂；
 - **权重化（L3）**：`recalls` + 高频节点可导出 (query, decision) 对，用于 LoRA；
-- **MCP**：`src/engine/index.mjs` 不依赖 DSH，包一层 stdio server 即可复用。
+- **MCP**：`src/mcp/server.mjs` 已实现 stdio 工具；其他宿主可复用协议接入。
 
 ## 12. 模块地图
 
@@ -228,7 +243,11 @@ session/event ──▶ 缓冲（按 session）
 | `src/dsh/tools.mjs` | 五个工具定义 |
 | `src/dsh/capture.mjs` | 会话缓冲与串行 flush |
 | `src/dsh/inject.mjs` | 提取 query、构造/插入召回消息、去重守卫 |
-| `src/dsh/host-client.mjs` | 宿主侧 IPC 客户端：超时、降级、重启 |
-| `src/dsh/engine-host.mjs` | 子进程入口：串行执行引擎方法、写 plugin.log |
-| `src/dsh/log-file.mjs` | 512 KB 轮转文件日志 |
+| `src/dsh/host-client.mjs` / `engine-host.mjs` / `log-file.mjs` | 旧导入路径的兼容入口 |
+| `src/runtime/client.mjs` / `engine-host.mjs` | 共用 IPC 客户端、隔离进程、超时与重启 |
+| `src/runtime/service.mjs` / `operation-lock.mjs` | 串行操作、跨进程协调、embedding 身份检查 |
+| `src/runtime/log-file.mjs` | 512 KB 轮转文件日志 |
+| `src/mcp/server.mjs` | MCP stdio 五个记忆工具 |
+| `src/codex/hook.mjs` / `queue.mjs` | 生命周期适配、持久重试队列 |
+| `scripts/install-codex.mjs` | Codex 配置合并、备份、卸载 |
 | `src/plugin.mjs` | Config、apply、生命周期（不含任何引擎代码） |

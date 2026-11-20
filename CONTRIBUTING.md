@@ -1,7 +1,8 @@
 # Contributing
 
 Thanks for helping. This project is deliberately small: a framework-agnostic engine
-(`src/engine/`) plus a thin DSH adapter (`src/dsh/`, `src/plugin.mjs`). Keeping that
+(`src/engine/`) plus thin DSH (`src/dsh/`, `src/plugin.mjs`) and Codex/MCP adapters
+(`src/codex/`, `src/mcp/`). Shared process management lives in `src/runtime/`. Keeping that
 split is the first rule — the engine must never import `@deepseek-ai/*`.
 
 ## Development setup
@@ -9,6 +10,8 @@ split is the first rule — the engine must never import `@deepseek-ai/*`.
 ```bash
 # Node 24 (or >= 22.5 for the engine alone)
 node scripts/selftest.mjs        # offline: AST, storage, recall, tiering, recovery
+npm ci                          # MCP adapter dependencies; engine stays dependency-free
+npm run test:codex               # real MCP stdio, hooks, shared storage, installer
 node scripts/bench.mjs           # latency/size numbers for the README
 ```
 
@@ -34,11 +37,14 @@ packages live in `~/.dsh/profiles/node_modules`; the linked copy under
 | Capture behaviour | `src/dsh/capture.mjs` |
 | Injection / prompt | `src/dsh/inject.mjs`, `src/plugin.mjs` |
 | New tool | `src/dsh/tools.mjs` |
+| Codex lifecycle hooks | `src/codex/hook.mjs`, `src/codex/queue.mjs`, `tests/codex.test.mjs` |
+| MCP tools | `src/mcp/server.mjs`, `tests/codex.test.mjs` |
+| Shared process isolation/concurrency | `src/runtime/`, containment test + Codex suite |
 
 Guidelines:
 
 - **Engine stays dependency-free**: Node built-ins only (`node:sqlite`, `node:crypto`, ...).
-- **Every behaviour change gets a check** in `scripts/selftest.mjs` (offline, fake embedder).
+- **Every behaviour change gets a check** in `scripts/selftest.mjs` or `tests/codex.test.mjs` (offline, fake embedder).
 - **Never log or embed secrets.** Keys come from env or `credentials.json` only;
   `node scripts/check-secrets.mjs` must stay clean.
 - **Keep default behaviour quiet**: memory capture is local, auto-recall is bounded and
@@ -81,7 +87,7 @@ MEMORY_TREE_EMBED_PRESET=myprovider MEMORY_TREE_API_KEY=... node scripts/selftes
 
 - `sqlite-vec` (or another ANN backend) behind the existing `store.listVectors` seam;
 - offline consolidation (summaries, merge, conflict detection) for Phase 2;
-- an MCP server wrapper around `src/engine/index.mjs`;
+- additional client adapters on the existing MCP/runtime surfaces;
 - a memory-graph visualisation (Three.js) fed by `nodes` + `edges`;
 - translations of the README (Japanese, Korean, Spanish…).
 

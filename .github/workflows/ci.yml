@@ -23,6 +23,12 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Offline engine suite (AST, SQLite, recall, tiering, recovery)
         run: node scripts/selftest.mjs
+      - name: Install MCP adapter dependencies
+        run: npm ci
+      - name: Codex MCP, hooks, shared storage and installer
+        run: npm run test:codex
+      - name: Engine process isolation
+        run: node scripts/test-containment.mjs
       - name: Syntax check
         run: |
           node --check src/plugin.mjs

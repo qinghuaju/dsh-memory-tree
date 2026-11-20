@@ -1,5 +1,5 @@
 /**
- * Public engine surface. Import this from a CLI, a future MCP server, tests, or
+ * Public engine surface. Import this from a CLI, the MCP adapter, tests, or
  * any host that is not DeepSeek Harness.
  *
  * @module dsh-memory-tree/engine/index

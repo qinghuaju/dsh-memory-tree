@@ -242,12 +242,13 @@ export function resolveDshHome(env = process.env) {
  */
 export function resolveConfig(raw = {}, { env = process.env, cwd = process.cwd() } = {}) {
   const provided = raw ?? {};
-  const provisionalDataDir = expandPath(provided.dataDir || join(resolveDshHome(env), 'memory-tree'), cwd);
+  const defaultDataDir = env.MEMORY_TREE_DATA_DIR?.trim() || join(resolveDshHome(env), 'memory-tree');
+  const provisionalDataDir = expandPath(provided.dataDir || defaultDataDir, cwd);
   // `<dataDir>/config.json` lets the CLI and the plugin share one configuration
   // (the plugin's patch config still wins). Do not set dataDir in that file.
   const fileConfig = readJsonIfPresent(join(provisionalDataDir, 'config.json'));
   const merged = deepMerge(deepMerge(DEFAULT_CONFIG, fileConfig), provided);
-  const dataDir = expandPath(merged.dataDir || join(resolveDshHome(env), 'memory-tree'), cwd);
+  const dataDir = expandPath(merged.dataDir || defaultDataDir, cwd);
 
   const presetName = String(merged.embedding.preset || 'custom').toLowerCase();
   const preset = EMBED_PRESETS[presetName] ?? null;

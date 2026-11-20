@@ -157,7 +157,7 @@ node scripts/install.mjs --copy-to     # 已安装则输出 already installed
 ### Phase 4 — 多机与生态
 
 - 记忆库加密同步（对象存储 / Syncthing）+ 版本号冲突解决；
-- 抽出 MCP server（`src/engine` 已经与 DSH 解耦），供 Claude Code / 其它客户端复用；
+- 已实现 MCP stdio server 与 Codex Hooks；其他客户端可基于 MCP 继续适配，见 [CODEX.zh.md](CODEX.zh.md)；
 - 可视化记忆图谱（Three.js：节点=记忆，边=软相似）。
 
 ## 6. 风险与对策

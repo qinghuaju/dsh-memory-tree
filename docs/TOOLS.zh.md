@@ -2,7 +2,9 @@
 
 适用于 **dsh-memory-tree 0.2.3**、**DSH 0.2.1-rc.3**（Node 24）。[English](TOOLS.md) | 中文
 
-本文覆盖全部对外接口：5 个模型工具、自动召回注入、脚本用的引擎 API，以及 CLI。
+本文覆盖 DSH 的模型工具、自动召回、引擎 API 与 CLI。
+Codex MCP 工具需要显式传入项目 `cwd`，生命周期 Hooks 说明见 [Codex 接入](CODEX.zh.md)。
+并发集成可从 `dsh-memory-tree/runtime` 导入 `createEngineService`，使用其串行 `request` API。
 
 ---
 
